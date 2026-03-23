@@ -1,0 +1,5 @@
+# Додайте ці рядки в backend/.env.sample (або в .env), якщо їх ще немає.
+# Див. також docs/frontend.md, розділ CORS.
+
+# CORS — див. frontend/docs/frontend.md. Через кому; у production (NODE_ENV=production) обов’язково задати.
+# CORS_ORIGINS=http://localhost:4200,https://app.example.com

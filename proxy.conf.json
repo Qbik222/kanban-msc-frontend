@@ -1,0 +1,16 @@
+[
+  {
+    "context": ["/auth", "/users", "/boards", "/columns", "/cards", "/health", "/api"],
+    "target": "http://localhost:3500",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "silent"
+  },
+  {
+    "context": "/socket.io",
+    "target": "http://localhost:3500",
+    "secure": false,
+    "ws": true,
+    "changeOrigin": true
+  }
+]

@@ -1,0 +1,95 @@
+import { Component, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { AuthApiService } from '../../data/auth-api.service';
+import { AuthService } from '../../core/auth/auth.service';
+import { BoardStore } from '../../state/board.store';
+import { firstValueFrom } from 'rxjs';
+
+@Component({
+  selector: 'app-register',
+  standalone: true,
+  imports: [FormsModule, RouterLink],
+  template: `
+    <div class="mx-auto flex min-h-[60vh] max-w-md flex-col justify-center px-4">
+      <h1 class="mb-6 text-2xl font-semibold text-white">Create account</h1>
+      <form class="flex flex-col gap-4" (ngSubmit)="submit()">
+        <label class="flex flex-col gap-1 text-sm text-slate-300">
+          Name
+          <input
+            class="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+            name="name"
+            [(ngModel)]="name"
+            required
+            minlength="2"
+            autocomplete="name"
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-slate-300">
+          Email
+          <input
+            class="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+            type="email"
+            name="email"
+            [(ngModel)]="email"
+            required
+            autocomplete="email"
+          />
+        </label>
+        <label class="flex flex-col gap-1 text-sm text-slate-300">
+          Password
+          <input
+            class="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-white"
+            type="password"
+            name="password"
+            [(ngModel)]="password"
+            required
+            minlength="6"
+            autocomplete="new-password"
+          />
+        </label>
+        <button
+          type="submit"
+          class="rounded bg-emerald-600 px-4 py-2 font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
+          [disabled]="pending"
+        >
+          {{ pending ? 'Creating…' : 'Register' }}
+        </button>
+      </form>
+      <p class="mt-4 text-sm text-slate-400">
+        Already have an account?
+        <a routerLink="/login" class="text-emerald-400 hover:underline">Sign in</a>
+      </p>
+    </div>
+  `,
+})
+export class RegisterComponent {
+  private readonly authApi = inject(AuthApiService);
+  private readonly auth = inject(AuthService);
+  private readonly boardStore = inject(BoardStore);
+  private readonly router = inject(Router);
+
+  name = '';
+  email = '';
+  password = '';
+  pending = false;
+
+  async submit(): Promise<void> {
+    this.pending = true;
+    try {
+      const res = await firstValueFrom(
+        this.authApi.register({
+          name: this.name,
+          email: this.email,
+          password: this.password,
+        }),
+      );
+      this.auth.setToken(res.accessToken);
+      const user = this.auth.normalizeUser(res.user as Record<string, unknown>);
+      this.boardStore.setUser(user);
+      await this.router.navigateByUrl('/boards');
+    } finally {
+      this.pending = false;
+    }
+  }
+}

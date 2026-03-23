@@ -1,0 +1,3 @@
+# Append to backend .env.sample if missing:
+# CORS: see frontend/docs/frontend.md
+# CORS_ORIGINS=http://localhost:4200,https://app.example.com
