@@ -53,20 +53,29 @@ export class ShellComponent implements OnInit {
   private readonly router = inject(Router);
 
   async ngOnInit(): Promise<void> {
-    if (this.auth.getToken() && !this.boardStore.user()) {
+    if (this.auth.hasSession() && !this.boardStore.user()) {
       try {
         const me = await firstValueFrom(this.authApi.me());
         this.boardStore.setUser(me);
       } catch {
-        this.auth.setToken(null);
+        this.auth.clearSession();
       }
     }
   }
 
-  logout(): void {
-    this.auth.setToken(null);
-    this.boardStore.setUser(null);
-    this.boardStore.setActiveBoard(null);
-    void this.router.navigateByUrl('/login');
+  async logout(): Promise<void> {
+    const csrfToken = this.auth.getCsrfToken();
+    try {
+      if (csrfToken) {
+        await firstValueFrom(this.authApi.logout(csrfToken));
+      }
+    } catch {
+      // Client-side cleanup should still happen even if backend logout fails.
+    } finally {
+      this.auth.clearSession();
+      this.boardStore.setUser(null);
+      this.boardStore.setActiveBoard(null);
+      void this.router.navigateByUrl('/login');
+    }
   }
 }

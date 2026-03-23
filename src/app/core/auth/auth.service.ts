@@ -1,30 +1,56 @@
 import { Injectable, signal } from '@angular/core';
 import { UserProfile } from '../../models/board.models';
 
-const TOKEN_KEY = 'kanban_access_token';
-
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  readonly token = signal<string | null>(this.readToken());
+  readonly accessToken = signal<string | null>(null);
+  readonly csrfToken = signal<string | null>(null);
 
+  getAccessToken(): string | null {
+    return this.normalizeToken(this.accessToken());
+  }
+
+  getCsrfToken(): string | null {
+    return this.normalizeToken(this.csrfToken());
+  }
+
+  hasSession(): boolean {
+    return !!this.getAccessToken();
+  }
+
+  setSession(tokens: { accessToken: string | null | undefined; csrfToken: string | null | undefined }): void {
+    this.accessToken.set(this.normalizeToken(tokens.accessToken));
+    this.csrfToken.set(this.normalizeToken(tokens.csrfToken));
+  }
+
+  updateTokens(accessToken: string | null | undefined, csrfToken: string | null | undefined): void {
+    this.setSession({ accessToken, csrfToken });
+  }
+
+  clearSession(): void {
+    this.accessToken.set(null);
+    this.csrfToken.set(null);
+  }
+
+  // Legacy alias preserved for existing callers.
   getToken(): string | null {
-    return this.token();
+    return this.getAccessToken();
   }
 
-  setToken(token: string | null): void {
-    if (token) {
-      localStorage.setItem(TOKEN_KEY, token);
-    } else {
-      localStorage.removeItem(TOKEN_KEY);
-    }
-    this.token.set(token);
+  // Legacy alias preserved for existing callers.
+  setToken(token: string | null | undefined): void {
+    this.updateTokens(token, this.getCsrfToken());
   }
 
-  private readToken(): string | null {
-    if (typeof localStorage === 'undefined') {
+  private normalizeToken(token: string | null | undefined): string | null {
+    if (!token) {
       return null;
     }
-    return localStorage.getItem(TOKEN_KEY);
+    const cleaned = token.replace(/^Bearer\s+/i, '').trim();
+    if (!cleaned || cleaned === 'undefined' || cleaned === 'null') {
+      return null;
+    }
+    return cleaned;
   }
 
   normalizeUser(raw: Record<string, unknown>): UserProfile {

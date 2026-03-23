@@ -5,7 +5,7 @@ import { AuthService } from '../auth/auth.service';
 export const anonymousGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   const router = inject(Router);
-  if (auth.getToken()) {
+  if (auth.hasSession()) {
     return router.parseUrl('/boards');
   }
   return true;

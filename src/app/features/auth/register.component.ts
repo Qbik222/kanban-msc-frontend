@@ -84,7 +84,13 @@ export class RegisterComponent {
           password: this.password,
         }),
       );
-      this.auth.setToken(res.accessToken);
+      if (!res.accessToken || !res.csrfToken) {
+        throw new Error('Authentication token is missing in register response.');
+      }
+      this.auth.setSession({
+        accessToken: res.accessToken,
+        csrfToken: res.csrfToken,
+      });
       const user = this.auth.normalizeUser(res.user as Record<string, unknown>);
       this.boardStore.setUser(user);
       await this.router.navigateByUrl('/boards');

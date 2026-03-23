@@ -24,16 +24,12 @@
 CORS_ORIGINS=http://localhost:4200,https://app.example.com
 ```
 
-Після зміни **`CORS_ORIGINS`** або **`NODE_ENV`** перезапустіть API — список дозволених origins зчитується при старті (у консолі: `CORS allowed origins: ...`). У бекенді зразок змінних: **`.env.sample`** (рядок `CORS_ORIGINS` можна розкоментувати). Готовий фрагмент для вставки: [`cors-env-append-for-backend.txt`](cors-env-append-for-backend.txt).
-
-### Локальна розробка з Angular (`ng serve`)
-
-У каталозі frontend налаштовано **`proxy.conf.json`**: запити на `/auth`, `/users`, `/boards`, `/columns`, `/cards`, `/health`, `/api` та WebSocket `/socket.io` проксуються на `http://localhost:3500`. У **`environment.ts`** для dev за замовчуванням `apiUrl: ''` (відносні URL), тому браузер звертається лише до origin dev-сервера (наприклад `http://localhost:4200`) і CORS між 4200 і 3500 не потрібен. Для прямих запитів на API задайте `apiUrl: 'http://localhost:3500'` і переконайтеся, що ваш origin у **`CORS_ORIGINS`**.
-
 ## Концепт фронтенду
 
 - **Тип**: односторінковий додаток (SPA) з окремим HTTP-клієнтом і **одним** клієнтом Socket.IO на сесію (або на застосунок).
-- **Авторизація**: після `POST /auth/login` або `POST /auth/register` зберігати **`accessToken`** (наприклад у пам’яті + `localStorage` за потреби) і передавати в заголовку `Authorization: Bearer <accessToken>` для всіх захищених REST-запитів.
+- **Авторизація**: після `POST /auth/login` або `POST /auth/register` зберігати **`accessToken`** та **`csrfToken`** тільки в пам’яті фронтенду. `accessToken` передавати в `Authorization: Bearer <accessToken>` для захищених REST-запитів.
+- **Refresh cookie**: refresh JWT зберігається лише як HttpOnly cookie (JS не читає його), тому в усіх API-запитах потрібен `withCredentials: true`.
+- **CSRF**: для `POST /auth/refresh` і `POST /auth/logout` передавати заголовок `X-CSRF-Token` зі значенням останнього `csrfToken` із відповіді API.
 - **Дані дошки**: початкове завантаження канбану — `GET /boards/:id` (дошка з колонками та картками). Після змін з інших клієнтів оновлювати UI через події Socket.IO або робити повторний `GET /boards/:id` за потреби.
 - **Реалтайм**: після відкриття екрану дошки підключитися до Socket.IO і надіслати **`joinBoard`** з `boardId` і **тим самим JWT** у тілі події (див. нижче); без токена в події кімната дошки недоступна.
 
@@ -62,8 +58,10 @@ CORS_ORIGINS=http://localhost:4200,https://app.example.com
 
 | Метод | Шлях | Опис |
 | --- | --- | --- |
-| `POST` | `/auth/register` | Реєстрація; у відповіді `user` та `accessToken` |
-| `POST` | `/auth/login` | Вхід; `accessToken` |
+| `POST` | `/auth/register` | Реєстрація; у відповіді `user`, `accessToken`, `csrfToken` |
+| `POST` | `/auth/login` | Вхід; `accessToken`, `csrfToken` |
+| `POST` | `/auth/refresh` | Оновити access-токен через refresh cookie; потрібен `X-CSRF-Token`; у відповіді `accessToken`, `csrfToken` |
+| `POST` | `/auth/logout` | Завершити сесію; потрібен `X-CSRF-Token`; очищає refresh cookie |
 
 ### Users
 

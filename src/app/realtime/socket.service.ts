@@ -40,7 +40,7 @@ export class SocketService {
 
   joinBoard(boardId: string): void {
     this.ensureConnected();
-    const token = this.auth.getToken();
+    const token = this.auth.getAccessToken();
     if (!token || !this.socket) {
       return;
     }
