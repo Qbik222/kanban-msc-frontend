@@ -11,7 +11,7 @@ npm start
 
 Then open `http://localhost:4200/`. The CLI is available as `npx ng …` if `ng` is not on your PATH.
 
-`npm start` runs `ng serve` with [`proxy.conf.json`](proxy.conf.json): REST and Socket.IO are forwarded to the API on **port 3500**, so the browser talks to **4200 only** (no cross-origin requests to the API in dev).
+`npm start` runs `ng serve` with [`proxy.conf.js`](proxy.conf.js): REST and Socket.IO are forwarded to the API on **port 3500**, so the browser talks to **4200 only** (no cross-origin requests to the API in dev). Paths that overlap SPA routes (`/boards`, `/columns`, `/cards`) use a **`bypass`** so full page loads with `Accept: text/html` receive `index.html` instead of the API response.
 
 ## Auth and HTTP
 
