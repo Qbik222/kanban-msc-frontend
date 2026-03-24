@@ -21,7 +21,17 @@ export const routes: Routes = [
       import('./features/shell/shell.component').then((m) => m.ShellComponent),
     canActivate: [authGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'boards' },
+      { path: '', pathMatch: 'full', redirectTo: 'teams' },
+      {
+        path: 'teams',
+        loadComponent: () =>
+          import('./features/teams/teams-list.component').then((m) => m.TeamsListComponent),
+      },
+      {
+        path: 'teams/:teamId',
+        loadComponent: () =>
+          import('./features/teams/team-detail.component').then((m) => m.TeamDetailComponent),
+      },
       {
         path: 'boards',
         loadComponent: () =>
@@ -34,5 +44,5 @@ export const routes: Routes = [
       },
     ],
   },
-  { path: '**', redirectTo: 'boards' },
+  { path: '**', redirectTo: 'teams' },
 ];

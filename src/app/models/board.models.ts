@@ -41,6 +41,7 @@ export interface Column {
 export interface BoardSummary {
   id: string;
   title: string;
+  teamId: string;
   ownerId: string;
   projectIds: string[];
   isDeleted: boolean;

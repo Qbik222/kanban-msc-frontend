@@ -7,7 +7,7 @@ export const anonymousGuard: CanActivateFn = async () => {
   const router = inject(Router);
   await auth.bootstrapSession();
   if (auth.hasSession()) {
-    return router.parseUrl('/boards');
+    return router.parseUrl('/teams');
   }
   return true;
 };

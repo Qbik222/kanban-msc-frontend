@@ -43,7 +43,6 @@ export const ROLE_PERMISSIONS: Record<BoardRole, readonly string[]> = {
     'member:remove',
   ],
   viewer: [
-    'board:create',
     'board:list',
     'board:read',
     'comment:create',

@@ -1,5 +1,5 @@
 /**
- * Browser navigation to /boards (and other REST paths used as SPA routes) would otherwise
+ * Browser navigation to /boards, /teams, etc. (REST paths that overlap SPA routes) would otherwise
  * be proxied to the API and return JSON 401. Serve index.html for document requests instead.
  */
 function spaHtmlBypass(req) {
@@ -10,6 +10,7 @@ function spaHtmlBypass(req) {
   const path = (req.url ?? '').split('?')[0];
   if (
     path.startsWith('/boards') ||
+    path.startsWith('/teams') ||
     path.startsWith('/columns') ||
     path.startsWith('/cards')
   ) {
@@ -20,7 +21,7 @@ function spaHtmlBypass(req) {
 
 module.exports = [
   {
-    context: ['/auth', '/users', '/boards', '/columns', '/cards', '/health', '/api'],
+    context: ['/auth', '/users', '/teams', '/boards', '/columns', '/cards', '/health', '/api'],
     target: 'http://localhost:3500',
     secure: false,
     changeOrigin: true,

@@ -4,6 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { BoardApiService } from '../data/board-api.service';
 import { BoardDetails, BoardSummary, Card, Column, UserProfile } from '../models/board.models';
 import { BoardRole, ROLE_PERMISSIONS, roleHasAnyPermission } from './permissions';
+import { TeamStore } from './team.store';
 
 function sortColumns(cols: Column[]): Column[] {
   return [...cols].sort((a, b) => a.order - b.order);
@@ -86,12 +87,20 @@ export const BoardStore = signalStore(
   { providedIn: 'root' },
   withState(initialState),
   withComputed((store) => {
+    const teamStore = inject(TeamStore);
     const isOwner = computed(() => {
       const u = store.user();
       const b = store.activeBoard();
       return !!(u && b && u.id === b.ownerId);
     });
-    const effectiveRole = computed((): BoardRole => (isOwner() ? 'owner' : 'viewer'));
+    /** Team admin has full board rights on the backend without board membership; mirror as owner for UI. */
+    const isTeamAdminForActiveBoard = computed(() => {
+      const b = store.activeBoard();
+      return teamStore.isTeamAdmin(b?.teamId);
+    });
+    const effectiveRole = computed((): BoardRole =>
+      isOwner() || isTeamAdminForActiveBoard() ? 'owner' : 'viewer',
+    );
     const permissions = computed(() => {
       const role = effectiveRole();
       return new Set(ROLE_PERMISSIONS[role]);

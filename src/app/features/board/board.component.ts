@@ -12,10 +12,20 @@ import { ColumnComponent } from './column.component';
 import { AiAssistantComponent } from './ai-assistant';
 import { FormsModule } from '@angular/forms';
 import { CardModalComponent, CardModalSavePayload } from './card-modal.component';
+import { CanViewDirective } from '../../shared/directives/can-view.directive';
+import { ToastService } from '../../core/toast/toast.service';
+
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [DragDropModule, ColumnComponent, AiAssistantComponent, FormsModule, CardModalComponent],
+  imports: [
+    DragDropModule,
+    ColumnComponent,
+    AiAssistantComponent,
+    FormsModule,
+    CardModalComponent,
+    CanViewDirective,
+  ],
   template: `
     <div class="relative flex h-[calc(100vh-8rem)] flex-col">
       @if (boardStore.loading() && !boardStore.activeBoard()) {
@@ -23,8 +33,11 @@ import { CardModalComponent, CardModalSavePayload } from './card-modal.component
       } @else if (boardStore.error()) {
         <p class="text-red-400">{{ boardStore.error() }}</p>
       } @else if (boardStore.activeBoard()) {
-        <div class="mb-4 flex items-center justify-between gap-4">
-          <h1 class="text-xl font-semibold text-white">{{ boardStore.activeBoard()!.title }}</h1>
+        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 class="text-xl font-semibold text-white">{{ boardStore.activeBoard()!.title }}</h1>
+            <p class="mt-0.5 text-xs text-slate-500">team: {{ boardStore.activeBoard()!.teamId }}</p>
+          </div>
           @if (boardStore.canEdit()) {
             <div class="flex items-center gap-2">
               <input
@@ -45,6 +58,23 @@ import { CardModalComponent, CardModalSavePayload } from './card-modal.component
               </button>
             </div>
           }
+        </div>
+        <div *canView="['member:invite']" class="mb-3 flex flex-wrap items-center gap-2 text-sm">
+          <span class="text-slate-400">Запросити на дошку (userId, та сама команда):</span>
+          <input
+            type="text"
+            class="w-48 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
+            [(ngModel)]="inviteUserId"
+            [disabled]="invitingMember"
+          />
+          <button
+            type="button"
+            class="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600 disabled:opacity-50"
+            [disabled]="invitingMember || !inviteUserId.trim()"
+            (click)="inviteBoardMember()"
+          >
+            {{ invitingMember ? '…' : 'Запросити' }}
+          </button>
         </div>
         <div cdkDropListGroup class="flex min-w-full flex-1 gap-4 overflow-x-auto pb-4">
           @for (col of boardStore.sortedColumns(); track col.id) {
@@ -80,7 +110,10 @@ export class BoardComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(BoardApiService);
   private readonly socket = inject(SocketService);
+  private readonly toast = inject(ToastService);
   newColumnTitle = '';
+  inviteUserId = '';
+  invitingMember = false;
   creatingColumn = false;
   creatingCardColumnId: string | null = null;
   skeletonCardId: string | null = null;
@@ -107,6 +140,24 @@ export class BoardComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.boardStore.setActiveBoard(null);
+  }
+
+  async inviteBoardMember(): Promise<void> {
+    const board = this.boardStore.activeBoard();
+    const userId = this.inviteUserId.trim();
+    if (!board || !userId || this.invitingMember) {
+      return;
+    }
+    this.invitingMember = true;
+    try {
+      await firstValueFrom(this.api.inviteBoardMember(board.id, { userId }));
+      this.inviteUserId = '';
+      this.toast.show('Запрошення надіслано', 'success');
+    } catch (e) {
+      this.toast.show(e instanceof Error ? e.message : 'Не вдалося запросити', 'error');
+    } finally {
+      this.invitingMember = false;
+    }
   }
 
   async createColumn(): Promise<void> {

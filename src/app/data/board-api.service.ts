@@ -17,8 +17,12 @@ export class BoardApiService {
     return this.http.get<BoardDetails>(`${this.api}/boards/${id}`);
   }
 
-  createBoard(body: { title: string; projectIds?: string[] }): Observable<BoardSummary> {
+  createBoard(body: { title: string; teamId: string; projectIds?: string[] }): Observable<BoardSummary> {
     return this.http.post<BoardSummary>(`${this.api}/boards`, body);
+  }
+
+  inviteBoardMember(boardId: string, body: { userId: string }): Observable<unknown> {
+    return this.http.post(`${this.api}/boards/${boardId}/members`, body);
   }
 
   patchBoard(id: string, body: Partial<{ title: string; projectIds: string[] }>): Observable<BoardSummary> {

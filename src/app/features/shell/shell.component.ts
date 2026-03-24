@@ -1,20 +1,21 @@
 import { Component, OnInit, inject } from '@angular/core';
-import { Router, RouterLink, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { AuthApiService } from '../../data/auth-api.service';
 import { BoardStore } from '../../state/board.store';
+import { TeamStore } from '../../state/team.store';
 import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive],
   template: `
     <div class="flex min-h-screen flex-col">
       <header
         class="flex items-center justify-between border-b border-slate-800 bg-slate-900/80 px-4 py-3 backdrop-blur"
       >
-        <a routerLink="/boards" class="text-lg font-semibold text-white">Kanban</a>
+        <a routerLink="/teams" class="text-lg font-semibold text-white">Kanban</a>
         <div class="flex items-center gap-4">
           @if (boardStore.user(); as u) {
             <span class="text-sm text-slate-400">{{ u.name }}</span>
@@ -32,10 +33,17 @@ import { firstValueFrom } from 'rxjs';
         <aside class="hidden w-52 shrink-0 border-r border-slate-800 bg-slate-900/50 p-4 md:block">
           <nav class="flex flex-col gap-2 text-sm">
             <a
+              routerLink="/teams"
+              class="rounded px-2 py-1 text-slate-300 hover:bg-slate-800 hover:text-white"
+              routerLinkActive="bg-slate-800 text-white"
+              [routerLinkActiveOptions]="{ exact: true }"
+              >Команди</a
+            >
+            <a
               routerLink="/boards"
               class="rounded px-2 py-1 text-slate-300 hover:bg-slate-800 hover:text-white"
               routerLinkActive="bg-slate-800 text-white"
-              >Boards</a
+              >Дошки</a
             >
           </nav>
         </aside>
@@ -48,6 +56,7 @@ import { firstValueFrom } from 'rxjs';
 })
 export class ShellComponent implements OnInit {
   readonly boardStore = inject(BoardStore);
+  readonly teamStore = inject(TeamStore);
   private readonly auth = inject(AuthService);
   private readonly authApi = inject(AuthApiService);
   private readonly router = inject(Router);
@@ -61,6 +70,9 @@ export class ShellComponent implements OnInit {
         this.auth.clearSession();
       }
     }
+    if (this.auth.hasSession()) {
+      void this.teamStore.loadTeams();
+    }
   }
 
   async logout(): Promise<void> {
@@ -72,6 +84,7 @@ export class ShellComponent implements OnInit {
       this.auth.clearSession();
       this.boardStore.setUser(null);
       this.boardStore.setActiveBoard(null);
+      this.teamStore.reset();
       void this.router.navigateByUrl('/login');
     }
   }

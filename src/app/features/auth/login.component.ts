@@ -77,7 +77,7 @@ export class LoginComponent {
       });
       const user = this.auth.normalizeUser(res.user as Record<string, unknown>);
       this.boardStore.setUser(user);
-      await this.router.navigateByUrl('/boards');
+      await this.router.navigateByUrl('/teams');
     } finally {
       this.pending = false;
     }

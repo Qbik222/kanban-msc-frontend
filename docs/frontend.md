@@ -5,7 +5,7 @@
 ## Базова адреса API
 
 - За замовчуванням сервер слухає порт **3500** (див. `src/main.ts`).
-- Глобального префікса для REST немає: шляхи починаються з `/auth`, `/users`, `/boards`, `/columns`, `/cards`, `/health`.
+- Глобального префікса для REST немає: шляхи починаються з `/auth`, `/users`, `/teams`, `/boards`, `/columns`, `/cards`, `/health`.
 - Swagger UI: **`/api`** (наприклад `http://localhost:3500/api`).
 - WebSocket (Socket.IO): той самий origin, що й HTTP (наприклад `http://localhost:3500`).
 
@@ -48,14 +48,16 @@ CORS_ORIGINS=http://localhost:4200,https://app.example.com
 | --- | --- |
 | `/login` | Вхід |
 | `/register` | Реєстрація |
-| `/boards` | Список дошок поточного користувача |
+| `/teams` | Мої команди: список, створення команди |
+| `/teams/:teamId` | Деталі команди; для admin — учасники (запрошення, ролі) |
+| `/boards` | Список дошок поточного користувача (ізоляція по командах з боку API) |
 | `/boards/:boardId` | Канбан: колонки, картки, drag-and-drop, коментарі |
 | `/boards/:boardId/settings` (опційно) | Керування учасниками, якщо винесено з модалки |
 
 **Захист маршрутів**
 
 - **Гість** (немає валідного токена): доступ лише до `/login` та `/register`; спроба зайти на `/boards*` → редірект на `/login`.
-- **Авторизований користувач**: доступ до `/boards` та `/boards/:boardId`; з `/login` після успішного входу → `/boards`.
+- **Авторизований користувач**: доступ до `/teams`, `/boards` та `/boards/:boardId`; з `/login` після успішного входу → `/teams` (або `/boards` за політикою продукту).
 
 ## REST: ендпоінти та права
 
@@ -78,16 +80,33 @@ CORS_ORIGINS=http://localhost:4200,https://app.example.com
 | --- | --- | --- | --- |
 | `GET` | `/users/me` | (лише JWT) | Поточний профіль |
 
-### Boards
+### Teams
+
+Команди групують дошки. Роль у команді: **`admin`** | **`user`**. Керування членами (`POST` / `PATCH` / `DELETE` members) — лише для **`admin`** команди.
 
 | Метод | Шлях | Потрібний дозвіл | Опис |
 | --- | --- | --- | --- |
-| `POST` | `/boards` | `board:create` | Створити дошку |
+| `GET` | `/teams` | (JWT) | Список команд поточного користувача (з полем ролі користувача в кожній команді) |
+| `POST` | `/teams` | (JWT) | Створити команду (тіло зазвичай `{ "name": "..." }`; точна схема — Swagger) |
+| `GET` | `/teams/:teamId` | (JWT) | Опційно: деталі команди з учасниками (якщо реалізовано на бекенді) |
+| `POST` | `/teams/:teamId/members` | admin команди | Запросити учасника: `{ "userId": "<id>" }` |
+| `PATCH` | `/teams/:teamId/members/:userId` | admin команди | Змінити роль: `{ "role": "admin" \| "user" }` |
+| `DELETE` | `/teams/:teamId/members/:userId` | admin команди | Вилучити учасника |
+
+**Примітка для UI:** адмін команди на бекенді має повні права на всі дошки цієї команди без окремого membership на дошці. Фронт може показувати повний набір дій, якщо `GET /teams` підтверджує роль `admin` для `teamId` активної дошки, або ховати дії після **403**.
+
+### Boards
+
+У відповідях дошки є **`teamId`**. **`POST /boards`** обов’язково містить **`title`** та **`teamId`**; створювати дошки може лише **admin відповідної команди** (перевірка на бекенді). **`GET /boards`** повертає лише дошки, доступні користувачу (ізоляція по командах).
+
+| Метод | Шлях | Потрібний дозвіл | Опис |
+| --- | --- | --- | --- |
+| `POST` | `/boards` | `board:create` (і admin команди для `teamId`) | Створити дошку: `{ "title", "teamId", ... }` |
 | `GET` | `/boards` | `board:list` | Список дошок |
 | `GET` | `/boards/:id` | `board:read` | Дошка з колонками та картками |
 | `PATCH` | `/boards/:id` | `board:update` | Оновити дошку (наприклад назву) |
 | `DELETE` | `/boards/:id` | `board:delete` | М’яке видалення дошки |
-| `POST` | `/boards/:boardId/members` | `member:invite` | Запросити учасника |
+| `POST` | `/boards/:boardId/members` | `member:invite` | Запросити учасника дошки: `{ "userId" }`; дозволено лише для користувачів **тієї самої команди**; дефолтна роль на дошці після інвайту — **viewer** |
 | `PATCH` | `/boards/:boardId/members/:memberUserId/role` | `member:update_role` | Змінити роль учасника |
 | `DELETE` | `/boards/:boardId/members/:memberUserId` | `member:remove` | Вилучити учасника |
 
