@@ -10,6 +10,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 
 import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
+import { csrfCookieInterceptor } from './core/interceptors/csrf-cookie.interceptor';
 import { httpErrorInterceptor } from './core/interceptors/http-error.interceptor';
 import { GlobalErrorHandler } from './core/errors/global-error-handler';
 import { AuthService } from './core/auth/auth.service';
@@ -24,7 +25,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
     provideHttpClient(
-      withInterceptors([authInterceptor, httpErrorInterceptor]),
+      withInterceptors([csrfCookieInterceptor, authInterceptor, httpErrorInterceptor]),
       withXsrfConfiguration({
         cookieName: environment.csrfCookieName,
         headerName: 'X-XSRF-TOKEN',

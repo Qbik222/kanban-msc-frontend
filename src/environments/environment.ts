@@ -2,6 +2,6 @@
 export const environment = {
   production: false,
   apiUrl: '',
-  /** Must match backend `CSRF_COOKIE_NAME` when using double-submit CSRF (default on Nest side: XSRF-TOKEN). */
+  /** Match backend `CSRF_COOKIE_NAME`. Cookie should use `Path=/` (`CSRF_COOKIE_PATH`) so JS can read it on any SPA route. */
   csrfCookieName: 'XSRF-TOKEN',
 };

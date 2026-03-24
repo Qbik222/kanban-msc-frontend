@@ -16,6 +16,7 @@
 - **Локальна розробка** (`NODE_ENV` не `production`): якщо `CORS_ORIGINS` не задано, використовуються типові dev-URL (`http://localhost:4200`, `http://localhost:5173`, `http://127.0.0.1:4200`, `http://127.0.0.1:5173`).
 - **Production** (`NODE_ENV=production`): **`CORS_ORIGINS` обов’язковий**; інакше процес завершиться з помилкою при старті.
 - Запити **без** заголовка `Origin` (curl, Postman, тести) залишаються дозволеними.
+- **`credentials: true`** — для передачі **HttpOnly cookie** (refresh-токен) з браузера SPA потрібні `CORS_ORIGINS` з точним origin фронту та клієнтські запити з **`withCredentials: true`** (Angular `HttpClient` / `fetch` з `credentials: 'include'`).
 - Та сама політика застосовується до **REST** і до **Socket.IO** (див. `src/config/cors-origins.ts`).
 
 Приклад:
@@ -27,9 +28,15 @@ CORS_ORIGINS=http://localhost:4200,https://app.example.com
 ## Концепт фронтенду
 
 - **Тип**: односторінковий додаток (SPA) з окремим HTTP-клієнтом і **одним** клієнтом Socket.IO на сесію (або на застосунок).
-- **Авторизація**: після `POST /auth/login` або `POST /auth/register` зберігати **`accessToken`** та **`csrfToken`** тільки в пам’яті фронтенду. `accessToken` передавати в `Authorization: Bearer <accessToken>` для захищених REST-запитів.
-- **Refresh cookie**: refresh JWT зберігається лише як HttpOnly cookie (JS не читає його), тому в усіх API-запитах потрібен `withCredentials: true`.
-- **CSRF**: для `POST /auth/refresh` і `POST /auth/logout` передавати заголовок `X-CSRF-Token` зі значенням останнього `csrfToken` із відповіді API.
+- **Авторизація (access + refresh)**:
+  - **Access JWT** — короткоживучий, повертається в JSON (`accessToken`); зберігати в пам’яті (за бажання — `localStorage`); надсилати як `Authorization: Bearer <accessToken>`.
+  - **Refresh JWT** — лише в **HttpOnly cookie** (ім’я за замовчуванням `refresh`, шлях cookie `/auth`); JavaScript не читає.
+  - **`csrfToken`** — повертається в JSON після login/register/refresh; для `POST /auth/refresh` і `POST /auth/logout` потрібен той самий рядок у заголовку **`X-CSRF-Token`** або **`X-XSRF-TOKEN`** (alias для Angular).
+  - **Другий cookie (double-submit)**: бекенд виставляє **читабельний** cookie з тим самим значенням, що й `csrfToken` (ім’я за замовчуванням **`XSRF-TOKEN`**, **`CSRF_COOKIE_NAME`**), не HttpOnly; **шлях за замовчуванням `/`** (**`CSRF_COOKIE_PATH`**), щоб cookie була видима в `document.cookie` на будь-якому маршруті SPA (`/boards` тощо). **Refresh**-cookie залишається окремо (типово **HttpOnly**, path **`/auth`**). Після **повного reload** access/`csrfToken` у пам’яті порожні; браузер надсилає cookie; фронт читає `document.cookie` (ім’я з env) і підставляє **`X-CSRF-Token`** / **`X-XSRF-TOKEN`** — **не** покладаючись на `sessionStorage` як на єдине джерело. У тій самій вкладці до reload додатково можна використати останній `csrfToken` з JSON у пам’яті, якщо cookie ще не прочитана. Сервер перевіряє збіг заголовка з CSRF-cookie (timing-safe); якщо CSRF-cookie немає (старий клієнт) — лишається перевірка HMAC відносно сесії refresh.
+  - **Bootstrap після reload** (наприклад `APP_INITIALIZER`): `POST /auth/refresh` з **`withCredentials: true`** і CSRF-заголовком з **`document.cookie`** (основне джерело після F5); у тій самій вкладці без reload — за потреби з останнього JSON у пам’яті.
+  - На **401** від API: викликати `POST /auth/refresh` з `credentials` і CSRF-заголовком, оновити `accessToken` і `csrfToken`, повторити запит.
+  - Змінні оточення: `JWT_ACCESS_EXPIRES_IN` (напр. `15m`), `JWT_REFRESH_EXPIRES_IN` (напр. `7d`), `JWT_SECRET`, `JWT_REFRESH_SECRET`, опційно `CSRF_HMAC_SECRET`, `REFRESH_COOKIE_*`, `CSRF_COOKIE_NAME` — див. `src/auth/auth-cookie.config.ts`.
+
 - **Дані дошки**: початкове завантаження канбану — `GET /boards/:id` (дошка з колонками та картками). Після змін з інших клієнтів оновлювати UI через події Socket.IO або робити повторний `GET /boards/:id` за потреби.
 - **Реалтайм**: після відкриття екрану дошки підключитися до Socket.IO і надіслати **`joinBoard`** з `boardId` і **тим самим JWT** у тілі події (див. нижче); без токена в події кімната дошки недоступна.
 
@@ -58,10 +65,12 @@ CORS_ORIGINS=http://localhost:4200,https://app.example.com
 
 | Метод | Шлях | Опис |
 | --- | --- | --- |
-| `POST` | `/auth/register` | Реєстрація; у відповіді `user`, `accessToken`, `csrfToken` |
-| `POST` | `/auth/login` | Вхід; `accessToken`, `csrfToken` |
-| `POST` | `/auth/refresh` | Оновити access-токен через refresh cookie; потрібен `X-CSRF-Token`; у відповіді `accessToken`, `csrfToken` |
-| `POST` | `/auth/logout` | Завершити сесію; потрібен `X-CSRF-Token`; очищає refresh cookie |
+| `POST` | `/auth/register` | Реєстрація; JSON: `user`, `accessToken`, `csrfToken`; **Set-Cookie** refresh (HttpOnly) + читабельний CSRF-cookie (`XSRF-TOKEN` за замовчуванням) |
+| `POST` | `/auth/login` | Вхід; те саме + cookie |
+| `POST` | `/auth/refresh` | Новий `accessToken` + `csrfToken`; оновлюються обидва cookie; потрібні **cookie** + **`X-CSRF-Token`** або **`X-XSRF-TOKEN`** (значення збігається з CSRF-cookie / `csrfToken`) |
+| `POST` | `/auth/logout` | Відкликання refresh-сесії; **204**; очищаються refresh і CSRF cookie; **`X-CSRF-Token`** або **`X-XSRF-TOKEN`** |
+
+Усі запити до `/auth/*` з браузера з іншого origin — з **`withCredentials: true`**.
 
 ### Users
 

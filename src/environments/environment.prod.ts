@@ -1,6 +1,6 @@
 export const environment = {
   production: true,
   apiUrl: 'http://localhost:3500',
-  /** Override if backend `CSRF_COOKIE_NAME` differs; readable CSRF cookie must be visible to this origin for XSRF. */
+  /** Match backend `CSRF_COOKIE_NAME`; CSRF cookie `Path=/` must cover the SPA origin for `document.cookie` after reload. */
   csrfCookieName: 'XSRF-TOKEN',
 };

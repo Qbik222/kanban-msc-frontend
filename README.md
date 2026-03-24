@@ -16,9 +16,9 @@ Then open `http://localhost:4200/`. The CLI is available as `npx ng …` if `ng`
 ## Auth and HTTP
 
 - `POST /auth/login` and `POST /auth/register` return `accessToken`, `csrfToken`, and `user`.
-- The frontend keeps `accessToken` and `csrfToken` **in memory only** (no `localStorage` / `sessionStorage`).
-- Refresh token is an **HttpOnly** cookie (`/auth` path); a **readable** CSRF cookie (default name `XSRF-TOKEN`, configurable via `environment.csrfCookieName`) mirrors `csrfToken` for double-submit protection.
-- `provideHttpClient` uses **`withXsrfConfiguration`** so Angular sends **`X-XSRF-TOKEN`** on mutating requests (e.g. `POST /auth/refresh`, `POST /auth/logout`); the backend also accepts **`X-CSRF-Token`**.
+- The frontend keeps **`accessToken` and the in-memory `csrfToken` signal** from JSON only in RAM (not in `localStorage` / `sessionStorage`). After a full reload, the CSRF header for refresh/logout comes from the **readable CSRF cookie** (`document.cookie`, name from `environment.csrfCookieName`, default `XSRF-TOKEN`); the backend should set that cookie with **`Path=/`** (`CSRF_COOKIE_PATH`) so it is visible on any SPA route. If the cookie is momentarily unreadable in the same tab, the interceptor falls back to **`csrfToken` still in memory**.
+- Refresh token is an **HttpOnly** cookie (typical path `/auth`). The readable CSRF cookie mirrors `csrfToken` for double-submit protection.
+- `provideHttpClient` uses **`withXsrfConfiguration`** and **`csrfCookieInterceptor`** so **`X-XSRF-TOKEN`** / **`X-CSRF-Token`** are set on `POST /auth/refresh` and `POST /auth/logout`.
 - **`APP_INITIALIZER`** runs a **silent** `POST /auth/refresh` when there is no access token in memory so a full page reload can restore the session if the refresh cookie is still valid.
 - Protected requests use `Authorization: Bearer <accessToken>` and `withCredentials: true`.
 - On `401`, the auth interceptor performs one refresh attempt, then retries the original request.
