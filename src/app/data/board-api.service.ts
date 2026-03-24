@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { BoardDetails, BoardSummary, Card } from '../models/board.models';
+import { BoardDetails, BoardSummary, Card, CardDeadline } from '../models/board.models';
 
 @Injectable({ providedIn: 'root' })
 export class BoardApiService {
@@ -52,11 +52,23 @@ export class BoardApiService {
     assigneeId?: string;
     projectIds?: string[];
     priority?: 'low' | 'medium' | 'high';
+    deadline?: CardDeadline;
   }): Observable<Card> {
     return this.http.post<Card>(`${this.api}/cards`, body);
   }
 
-  patchCard(id: string, body: Record<string, unknown>): Observable<Card> {
+  patchCard(
+    id: string,
+    body: Record<string, unknown> &
+      Partial<{
+        title: string;
+        description: string;
+        priority: 'low' | 'medium' | 'high';
+        assigneeId: string;
+        projectIds: string[];
+        deadline: CardDeadline;
+      }>,
+  ): Observable<Card> {
     return this.http.patch<Card>(`${this.api}/cards/${id}`, body);
   }
 

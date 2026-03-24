@@ -13,7 +13,7 @@ Then open `http://localhost:4200/`. The CLI is available as `npx ng …` if `ng`
 
 `npm start` runs `ng serve` with [`proxy.conf.json`](proxy.conf.json): REST and Socket.IO are forwarded to the API on **port 3500**, so the browser talks to **4200 only** (no cross-origin requests to the API in dev).
 
-## Auth Flow (Cookie Refresh + Bearer Access)
+##  
 
 - `POST /auth/login` and `POST /auth/register` return `accessToken`, `csrfToken`, and `user`.
 - The frontend keeps `accessToken` and `csrfToken` in memory only (no `localStorage` persistence).

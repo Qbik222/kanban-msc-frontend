@@ -22,8 +22,9 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
           err.error?.message ? String(err.error.message) : 'Invalid credentials',
           'error',
         );
-      } else if (err.status === 401 && !isRefreshOrLogout && !auth.hasSession()) {
-        // Fallback: when session is already cleared by auth flow, force navigation to a public route.
+      } else if (err.status === 401 && !isRefreshOrLogout) {
+        // For private API 401 responses, clear local auth state and force public navigation.
+        auth.clearSession();
         void router.navigateByUrl('/login');
       } else if (err.error?.message && err.status !== 401) {
         toast.show(String(err.error.message), 'error');

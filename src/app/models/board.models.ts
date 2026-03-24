@@ -5,6 +5,11 @@ export interface CardComment {
   createdAt?: string | Date;
 }
 
+export interface CardDeadline {
+  startDate?: string | Date;
+  endDate?: string | Date;
+}
+
 export interface Card {
   id: string;
   title: string;
@@ -14,7 +19,7 @@ export interface Card {
   boardId: string;
   isDeleted: boolean;
   assigneeId?: string;
-  deadline?: { startDate?: string | Date; endDate?: string | Date };
+  deadline?: CardDeadline;
   projectIds: string[];
   priority?: 'low' | 'medium' | 'high';
   comments: CardComment[];

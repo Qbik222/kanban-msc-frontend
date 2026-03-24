@@ -51,7 +51,13 @@ export class SocketService {
     s.on('board:joined', () => undefined);
 
     s.on('board:join_error', (payload: { message?: string }) => {
-      this.toast.show(payload?.message ?? 'Could not join board channel', 'error');
+      const message = payload?.message ?? 'Could not join board channel';
+      if (message.toLowerCase().includes('unauthorized')) {
+        this.auth.clearSession();
+        void this.router.navigateByUrl('/login');
+        return;
+      }
+      this.toast.show(message, 'error');
     });
 
     s.on('board:updated', (board: BoardSummary) => {

@@ -1,11 +1,16 @@
-import { Component, Input } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { Card } from '../../models/board.models';
 
 @Component({
   selector: 'app-card',
   standalone: true,
+  imports: [DatePipe],
   template: `
-    <article class="rounded-md border border-slate-700 bg-slate-950/80 p-3 shadow-sm">
+    <article
+      class="rounded-md border border-slate-700 bg-slate-950/80 p-3 shadow-sm transition hover:border-slate-500"
+      (click)="clicked.emit()"
+    >
       <h3 class="font-medium text-slate-100">{{ card.title }}</h3>
       @if (card.description) {
         <p class="mt-1 line-clamp-3 text-xs text-slate-400">{{ card.description }}</p>
@@ -21,6 +26,13 @@ import { Card } from '../../models/board.models';
         @if (card.projectIds?.length) {
           <span>{{ card.projectIds.length }} projects</span>
         }
+        @if (card.deadline?.startDate && card.deadline?.endDate) {
+          <span>{{ card.deadline?.startDate | date: 'MMM d' }} - {{ card.deadline?.endDate | date: 'MMM d' }}</span>
+        } @else if (card.deadline?.startDate) {
+          <span>Start {{ card.deadline?.startDate | date: 'MMM d' }}</span>
+        } @else if (card.deadline?.endDate) {
+          <span>Due {{ card.deadline?.endDate | date: 'MMM d' }}</span>
+        }
         <span>{{ card.comments?.length ?? 0 }} comments</span>
       </div>
     </article>
@@ -28,4 +40,5 @@ import { Card } from '../../models/board.models';
 })
 export class CardComponent {
   @Input({ required: true }) card!: Card;
+  @Output() clicked = new EventEmitter<void>();
 }

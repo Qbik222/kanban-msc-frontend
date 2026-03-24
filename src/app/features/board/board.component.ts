@@ -11,10 +11,11 @@ import { Card, Column } from '../../models/board.models';
 import { ColumnComponent } from './column.component';
 import { AiAssistantComponent } from './ai-assistant';
 import { FormsModule } from '@angular/forms';
+import { CardModalComponent, CardModalSavePayload } from './card-modal.component';
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [DragDropModule, ColumnComponent, AiAssistantComponent, FormsModule],
+  imports: [DragDropModule, ColumnComponent, AiAssistantComponent, FormsModule, CardModalComponent],
   template: `
     <div class="relative flex h-[calc(100vh-8rem)] flex-col">
       @if (boardStore.loading() && !boardStore.activeBoard()) {
@@ -55,13 +56,31 @@ import { FormsModule } from '@angular/forms';
           >
             @for (col of boardStore.sortedColumns(); track col.id) {
               <div cdkDrag [cdkDragDisabled]="!boardStore.canEdit()" class="shrink-0">
-                <app-column [column]="col" (dropped)="onDrop($event, col.id)" />
+                <app-column
+                  [column]="col"
+                  [canEdit]="boardStore.canEdit()"
+                  [creatingCard]="creatingCardColumnId === col.id"
+                  [showSkeleton]="skeletonColumnId === col.id && !!skeletonCardId"
+                  [skeletonCardId]="skeletonCardId"
+                  [skeletonTitle]="skeletonTitle"
+                  [skeletonStartDate]="skeletonStartDate"
+                  [skeletonEndDate]="skeletonEndDate"
+                  (addCard)="onAddCard(col.id)"
+                  (openCard)="openCard($event)"
+                  (skeletonTitleChange)="skeletonTitle = $event"
+                  (skeletonStartDateChange)="skeletonStartDate = $event"
+                  (skeletonEndDateChange)="skeletonEndDate = $event"
+                  (saveSkeleton)="saveSkeleton()"
+                  (cancelSkeleton)="cancelSkeleton()"
+                  (dropped)="onDrop($event, col.id)"
+                />
               </div>
             }
           </div>
         </div>
       }
       <app-ai-assistant />
+      <app-card-modal [card]="activeModalCard()" (close)="closeCardModal()" (save)="saveCardModal($event)" />
     </div>
   `,
 })
@@ -72,6 +91,13 @@ export class BoardComponent implements OnDestroy {
   private readonly socket = inject(SocketService);
   newColumnTitle = '';
   creatingColumn = false;
+  creatingCardColumnId: string | null = null;
+  skeletonCardId: string | null = null;
+  skeletonColumnId: string | null = null;
+  skeletonTitle = '';
+  skeletonStartDate = '';
+  skeletonEndDate = '';
+  selectedCardId: string | null = null;
 
   constructor() {
     this.route.paramMap
@@ -119,6 +145,79 @@ export class BoardComponent implements OnDestroy {
     }
   }
 
+  async onAddCard(columnId: string): Promise<void> {
+    if (!this.boardStore.canEdit() || this.creatingCardColumnId) {
+      return;
+    }
+    const board = this.boardStore.activeBoard();
+    if (!board) {
+      return;
+    }
+    const previous = structuredClone(board);
+    this.creatingCardColumnId = columnId;
+    this.boardStore.setError(null);
+    try {
+      const created = await firstValueFrom(
+        this.api.createCard({
+          columnId,
+          title: 'New task',
+          description: '',
+        }),
+      );
+      await firstValueFrom(this.api.moveCard(created.id, { targetColumnId: columnId, newOrder: 0 }));
+      await this.boardStore.refreshActiveBoard();
+      this.skeletonCardId = created.id;
+      this.skeletonColumnId = columnId;
+      const card = this.findCard(created.id);
+      this.skeletonTitle = card?.title ?? 'New task';
+      this.skeletonStartDate = this.toDateInputValue(card?.deadline?.startDate);
+      this.skeletonEndDate = this.toDateInputValue(card?.deadline?.endDate);
+    } catch (e) {
+      this.boardStore.setActiveBoard(previous);
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to create card');
+    } finally {
+      this.creatingCardColumnId = null;
+    }
+  }
+
+  async saveSkeleton(): Promise<void> {
+    if (!this.skeletonCardId || !this.skeletonTitle.trim()) {
+      return;
+    }
+    try {
+      const updated = await firstValueFrom(
+        this.api.patchCard(this.skeletonCardId, {
+          title: this.skeletonTitle.trim(),
+          deadline:
+            this.skeletonStartDate || this.skeletonEndDate
+              ? {
+                  startDate: this.skeletonStartDate || undefined,
+                  endDate: this.skeletonEndDate || undefined,
+                }
+              : undefined,
+        }),
+      );
+      this.boardStore.upsertCard(updated);
+      this.clearSkeleton();
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to save card');
+    }
+  }
+
+  async cancelSkeleton(): Promise<void> {
+    if (!this.skeletonCardId) {
+      return;
+    }
+    const id = this.skeletonCardId;
+    this.clearSkeleton();
+    try {
+      await firstValueFrom(this.api.deleteCard(id));
+      await this.boardStore.refreshActiveBoard();
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to cancel card draft');
+    }
+  }
+
   async onDrop(event: CdkDragDrop<Card[]>, targetColumnId: string): Promise<void> {
     if (!this.boardStore.canEdit()) {
       return;
@@ -139,6 +238,45 @@ export class BoardComponent implements OnDestroy {
     } catch {
       this.boardStore.setActiveBoard(previous);
     }
+  }
+
+  openCard(card: Card): void {
+    if (this.skeletonCardId === card.id) {
+      return;
+    }
+    this.selectedCardId = card.id;
+  }
+
+  closeCardModal(): void {
+    this.selectedCardId = null;
+  }
+
+  async saveCardModal(payload: CardModalSavePayload): Promise<void> {
+    const card = this.activeModalCard();
+    if (!card) {
+      return;
+    }
+    try {
+      const updated = await firstValueFrom(
+        this.api.patchCard(card.id, {
+          title: payload.title,
+          description: payload.description,
+          priority: payload.priority,
+          deadline: payload.deadline,
+        }),
+      );
+      this.boardStore.upsertCard(updated);
+      this.closeCardModal();
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update card');
+    }
+  }
+
+  activeModalCard(): Card | null {
+    if (!this.selectedCardId) {
+      return null;
+    }
+    return this.findCard(this.selectedCardId);
   }
 
   async onColumnDrop(event: CdkDragDrop<Column[]>): Promise<void> {
@@ -170,5 +308,34 @@ export class BoardComponent implements OnDestroy {
     } catch {
       this.boardStore.setActiveBoard(previous);
     }
+  }
+
+  private clearSkeleton(): void {
+    this.skeletonCardId = null;
+    this.skeletonColumnId = null;
+    this.skeletonTitle = '';
+    this.skeletonStartDate = '';
+    this.skeletonEndDate = '';
+  }
+
+  private findCard(cardId: string): Card | null {
+    for (const col of this.boardStore.sortedColumns()) {
+      const found = col.cards.find((c) => c.id === cardId);
+      if (found) {
+        return found;
+      }
+    }
+    return null;
+  }
+
+  private toDateInputValue(raw: string | Date | undefined): string {
+    if (!raw) {
+      return '';
+    }
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return date.toISOString().slice(0, 10);
   }
 }
