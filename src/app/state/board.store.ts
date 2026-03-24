@@ -13,6 +13,16 @@ function sortCards(cards: Card[]): Card[] {
   return [...cards].sort((a, b) => a.order - b.order);
 }
 
+/** Sort columns and card arrays once when ingesting API/socket data (stable refs for CDK drop lists). */
+function normalizeBoard(board: BoardDetails): BoardDetails {
+  const next = structuredClone(board);
+  for (const col of next.columns) {
+    col.cards = sortCards(col.cards);
+  }
+  next.columns = sortColumns(next.columns);
+  return next;
+}
+
 function cloneBoard(board: BoardDetails): BoardDetails {
   return structuredClone(board);
 }
@@ -101,10 +111,7 @@ export const BoardStore = signalStore(
       if (!b) {
         return [];
       }
-      return sortColumns(b.columns).map((c) => ({
-        ...c,
-        cards: sortCards(c.cards),
-      }));
+      return sortColumns(b.columns);
     });
     return {
       isOwner,
@@ -151,7 +158,7 @@ export const BoardStore = signalStore(
         patchState(store, { loading: true, error: null });
         try {
           const board = await firstValueFrom(api.getBoard(id));
-          patchState(store, { activeBoard: board, loading: false });
+          patchState(store, { activeBoard: normalizeBoard(board), loading: false });
         } catch (e) {
           patchState(store, {
             loading: false,
@@ -167,7 +174,7 @@ export const BoardStore = signalStore(
         patchState(store, { loading: true, error: null });
         try {
           const board = await firstValueFrom(api.getBoard(b.id));
-          patchState(store, { activeBoard: board, loading: false });
+          patchState(store, { activeBoard: normalizeBoard(board), loading: false });
         } catch (e) {
           patchState(store, {
             loading: false,
@@ -185,15 +192,21 @@ export const BoardStore = signalStore(
         });
       },
       setBoardFullSnapshot(board: BoardDetails): void {
-        patchState(store, { activeBoard: board });
+        patchState(store, { activeBoard: normalizeBoard(board) });
       },
       replaceColumns(boardId: string, columns: Column[]): void {
         const cur = store.activeBoard();
         if (!cur || cur.id !== boardId) {
           return;
         }
+        const normalizedCols = sortColumns(
+          columns.map((col) => ({
+            ...col,
+            cards: sortCards(col.cards),
+          })),
+        );
         patchState(store, {
-          activeBoard: { ...cur, columns },
+          activeBoard: { ...cur, columns: normalizedCols },
         });
       },
       upsertCard(card: Card): void {

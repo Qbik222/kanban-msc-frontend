@@ -1,13 +1,13 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import { CdkDragDrop, DragDropModule, moveItemInArray } from '@angular/cdk/drag-drop';
+import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { filter, map, switchMap } from 'rxjs/operators';
 import { firstValueFrom, from } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BoardApiService } from '../../data/board-api.service';
 import { BoardStore } from '../../state/board.store';
 import { SocketService } from '../../realtime/socket.service';
-import { Card, Column } from '../../models/board.models';
+import { Card } from '../../models/board.models';
 import { ColumnComponent } from './column.component';
 import { AiAssistantComponent } from './ai-assistant';
 import { FormsModule } from '@angular/forms';
@@ -46,37 +46,28 @@ import { CardModalComponent, CardModalSavePayload } from './card-modal.component
             </div>
           }
         </div>
-        <div cdkDropListGroup class="flex flex-1 overflow-x-auto pb-4">
-          <div
-            cdkDropList
-            cdkDropListOrientation="horizontal"
-            [cdkDropListData]="boardStore.sortedColumns()"
-            class="flex min-w-full gap-4"
-            (cdkDropListDropped)="onColumnDrop($event)"
-          >
-            @for (col of boardStore.sortedColumns(); track col.id) {
-              <div cdkDrag [cdkDragDisabled]="!boardStore.canEdit()" class="shrink-0">
-                <app-column
-                  [column]="col"
-                  [canEdit]="boardStore.canEdit()"
-                  [creatingCard]="creatingCardColumnId === col.id"
-                  [showSkeleton]="skeletonColumnId === col.id && !!skeletonCardId"
-                  [skeletonCardId]="skeletonCardId"
-                  [skeletonTitle]="skeletonTitle"
-                  [skeletonStartDate]="skeletonStartDate"
-                  [skeletonEndDate]="skeletonEndDate"
-                  (addCard)="onAddCard(col.id)"
-                  (openCard)="openCard($event)"
-                  (skeletonTitleChange)="skeletonTitle = $event"
-                  (skeletonStartDateChange)="skeletonStartDate = $event"
-                  (skeletonEndDateChange)="skeletonEndDate = $event"
-                  (saveSkeleton)="saveSkeleton()"
-                  (cancelSkeleton)="cancelSkeleton()"
-                  (dropped)="onDrop($event, col.id)"
-                />
-              </div>
-            }
-          </div>
+        <div cdkDropListGroup class="flex min-w-full flex-1 gap-4 overflow-x-auto pb-4">
+          @for (col of boardStore.sortedColumns(); track col.id) {
+            <app-column
+              class="shrink-0"
+              [column]="col"
+              [canEdit]="boardStore.canEdit()"
+              [creatingCard]="creatingCardColumnId === col.id"
+              [showSkeleton]="skeletonColumnId === col.id && !!skeletonCardId"
+              [skeletonCardId]="skeletonCardId"
+              [skeletonTitle]="skeletonTitle"
+              [skeletonStartDate]="skeletonStartDate"
+              [skeletonEndDate]="skeletonEndDate"
+              (addCard)="onAddCard(col.id)"
+              (openCard)="openCard($event)"
+              (skeletonTitleChange)="skeletonTitle = $event"
+              (skeletonStartDateChange)="skeletonStartDate = $event"
+              (skeletonEndDateChange)="skeletonEndDate = $event"
+              (saveSkeleton)="saveSkeleton()"
+              (cancelSkeleton)="cancelSkeleton()"
+              (dropped)="onDrop($event, col.id)"
+            />
+          }
         </div>
       }
       <app-ai-assistant />
@@ -277,37 +268,6 @@ export class BoardComponent implements OnDestroy {
       return null;
     }
     return this.findCard(this.selectedCardId);
-  }
-
-  async onColumnDrop(event: CdkDragDrop<Column[]>): Promise<void> {
-    if (!this.boardStore.canEdit()) {
-      return;
-    }
-    if (event.previousIndex === event.currentIndex) {
-      return;
-    }
-    const board = this.boardStore.activeBoard();
-    if (!board) {
-      return;
-    }
-    const previous = structuredClone(board);
-    const reordered = [...this.boardStore.sortedColumns()];
-    moveItemInArray(reordered, event.previousIndex, event.currentIndex);
-    const normalized = reordered.map((col, order) => ({ ...col, order }));
-    this.boardStore.setActiveBoard({ ...board, columns: normalized });
-    try {
-      await firstValueFrom(
-        this.api.reorderColumns(
-          normalized.map((col) => ({
-            id: col.id,
-            order: col.order,
-          })),
-        ),
-      );
-      await this.boardStore.refreshActiveBoard();
-    } catch {
-      this.boardStore.setActiveBoard(previous);
-    }
   }
 
   private clearSkeleton(): void {
