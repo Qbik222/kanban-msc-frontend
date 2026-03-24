@@ -2,4 +2,6 @@
 export const environment = {
   production: false,
   apiUrl: '',
+  /** Must match backend `CSRF_COOKIE_NAME` when using double-submit CSRF (default on Nest side: XSRF-TOKEN). */
+  csrfCookieName: 'XSRF-TOKEN',
 };

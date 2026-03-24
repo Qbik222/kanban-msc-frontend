@@ -44,26 +44,14 @@ export class AuthApiService {
     });
   }
 
-  refresh(csrfToken: string): Observable<RefreshResponse> {
-    return this.http.post<RefreshResponse>(
-      `${this.base}/refresh`,
-      {},
-      {
-        withCredentials: true,
-        headers: { 'X-CSRF-Token': csrfToken },
-      },
-    );
+  /** CSRF header is added by Angular XSRF from the readable cookie (double-submit). */
+  refresh(): Observable<RefreshResponse> {
+    return this.http.post<RefreshResponse>(`${this.base}/refresh`, {}, { withCredentials: true });
   }
 
-  logout(csrfToken: string): Observable<void> {
-    return this.http.post<void>(
-      `${this.base}/logout`,
-      {},
-      {
-        withCredentials: true,
-        headers: { 'X-CSRF-Token': csrfToken },
-      },
-    );
+  /** CSRF header is added by Angular XSRF from the readable cookie (double-submit). */
+  logout(): Observable<void> {
+    return this.http.post<void>(`${this.base}/logout`, {}, { withCredentials: true });
   }
 
   me(): Observable<UserProfile> {

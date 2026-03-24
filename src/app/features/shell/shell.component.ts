@@ -64,11 +64,8 @@ export class ShellComponent implements OnInit {
   }
 
   async logout(): Promise<void> {
-    const csrfToken = this.auth.getCsrfToken();
     try {
-      if (csrfToken) {
-        await firstValueFrom(this.authApi.logout(csrfToken));
-      }
+      await firstValueFrom(this.authApi.logout());
     } catch {
       // Client-side cleanup should still happen even if backend logout fails.
     } finally {

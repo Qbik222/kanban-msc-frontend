@@ -41,15 +41,9 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (err.status !== 401 || authRoute || refreshRequest || retried) {
         return throwError(() => err);
       }
-      const csrfToken = auth.getCsrfToken();
-      if (!csrfToken) {
-        auth.clearSession();
-        void router.navigateByUrl('/login');
-        return throwError(() => err);
-      }
 
       if (!refreshInFlight$) {
-        refreshInFlight$ = authApi.refresh(csrfToken).pipe(
+        refreshInFlight$ = authApi.refresh().pipe(
           shareReplay(1),
           finalize(() => {
             refreshInFlight$ = null;
