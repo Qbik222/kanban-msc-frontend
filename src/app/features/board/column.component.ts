@@ -16,8 +16,9 @@ import { CardComponent } from './card.component';
         <h2 class="font-medium text-slate-100">{{ column.title }}</h2>
         <button
           type="button"
-          class="rounded px-1.5 py-0.5 text-sm text-slate-400 opacity-0 transition hover:bg-slate-800 hover:text-white group-hover:opacity-100"
-          [disabled]="!canEdit || creatingCard"
+          class="rounded px-1.5 py-0.5 text-sm text-slate-400 opacity-0 transition hover:bg-slate-800 hover:text-white group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+          [disabled]="!canCreateCard || creatingCard"
+          [title]="!canCreateCard ? 'Немає прав створювати картки' : ''"
           (click)="addCard.emit()"
         >
           +
@@ -27,7 +28,11 @@ import { CardComponent } from './card.component';
         cdkDropList
         [id]="column.id"
         [cdkDropListData]="column.cards"
+        [cdkDropListDisabled]="!canMoveCards"
+        [title]="!canMoveCards ? 'Немає прав переміщати картки' : ''"
         class="flex flex-1 flex-col gap-2 overflow-y-auto p-2"
+        [class.cursor-not-allowed]="!canMoveCards"
+        [class.opacity-75]="!canMoveCards"
         (cdkDropListDropped)="dropped.emit($event)"
       >
         @if (showSkeleton) {
@@ -71,15 +76,25 @@ import { CardComponent } from './card.component';
         }
         @for (c of column.cards; track c.id) {
           @if (!(showSkeleton && c.id === skeletonCardId)) {
-            <div cdkDrag [cdkDragData]="c" class="cursor-grab active:cursor-grabbing">
+            <div
+              cdkDrag
+              [cdkDragData]="c"
+              [cdkDragDisabled]="!canMoveCards"
+              [title]="!canMoveCards ? 'Немає прав переміщати картки' : ''"
+              class="active:cursor-grabbing"
+              [class.cursor-grab]="canMoveCards"
+              [class.cursor-not-allowed]="!canMoveCards"
+              [class.opacity-60]="!canMoveCards"
+            >
               <app-card [card]="c" (clicked)="openCard.emit(c)" />
             </div>
           }
         }
         <button
           type="button"
-          class="mt-1 rounded border border-dashed border-slate-700 px-2 py-2 text-left text-xs text-slate-400 opacity-0 transition hover:border-slate-500 hover:text-slate-200 group-hover:opacity-100"
-          [disabled]="!canEdit || creatingCard"
+          class="mt-1 rounded border border-dashed border-slate-700 px-2 py-2 text-left text-xs text-slate-400 opacity-0 transition hover:border-slate-500 hover:text-slate-200 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
+          [disabled]="!canCreateCard || creatingCard"
+          [title]="!canCreateCard ? 'Немає прав створювати картки' : ''"
           (click)="addCard.emit()"
         >
           + Add card
@@ -90,7 +105,8 @@ import { CardComponent } from './card.component';
 })
 export class ColumnComponent {
   @Input({ required: true }) column!: Column;
-  @Input() canEdit = false;
+  @Input() canCreateCard = false;
+  @Input() canMoveCards = false;
   @Input() creatingCard = false;
   @Input() showSkeleton = false;
   @Input() skeletonCardId: string | null = null;

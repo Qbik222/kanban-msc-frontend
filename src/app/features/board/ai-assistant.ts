@@ -46,7 +46,7 @@ import { BoardStore } from '../../state/board.store';
             <button
               type="button"
               class="rounded bg-emerald-700 px-2 py-1 text-xs text-white hover:bg-emerald-600 disabled:opacity-50"
-              [disabled]="running() || !boardStore.canEdit()"
+              [disabled]="running() || !boardStore.canMoveCards()"
               (click)="run()"
             >
               {{ running() ? '…' : 'Run' }}

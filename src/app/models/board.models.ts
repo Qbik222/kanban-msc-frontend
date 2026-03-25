@@ -53,6 +53,15 @@ export interface BoardDetails extends BoardSummary {
   columns: Column[];
 }
 
+export type BoardMemberRole = 'owner' | 'editor' | 'viewer';
+
+export interface BoardMemberDto {
+  id: string;
+  email: string;
+  name: string;
+  role: BoardMemberRole;
+}
+
 export interface UserProfile {
   id: string;
   email: string;

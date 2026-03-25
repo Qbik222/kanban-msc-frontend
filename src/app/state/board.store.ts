@@ -73,6 +73,8 @@ interface BoardState {
   user: UserProfile | null;
   loading: boolean;
   error: string | null;
+  /** Board role for the current user as inferred from BoardMember list (null = unknown / not loaded). */
+  activeBoardMemberRole: BoardRole | null;
 }
 
 const initialState: BoardState = {
@@ -81,6 +83,7 @@ const initialState: BoardState = {
   user: null,
   loading: false,
   error: null,
+  activeBoardMemberRole: null,
 };
 
 export const BoardStore = signalStore(
@@ -98,22 +101,24 @@ export const BoardStore = signalStore(
       const b = store.activeBoard();
       return teamStore.isTeamAdmin(b?.teamId);
     });
-    const effectiveRole = computed((): BoardRole =>
-      isOwner() || isTeamAdminForActiveBoard() ? 'owner' : 'viewer',
-    );
+    const effectiveRole = computed((): BoardRole => {
+      if (isTeamAdminForActiveBoard() || isOwner()) {
+        return 'owner';
+      }
+      // Board member role is loaded from GET /boards/:boardId/members and mapped to BoardRole.
+      // Fallback is viewer to match docs/permissions.md.
+      return store.activeBoardMemberRole() ?? 'viewer';
+    });
     const permissions = computed(() => {
       const role = effectiveRole();
       return new Set(ROLE_PERMISSIONS[role]);
     });
     const canEdit = computed(() =>
-      roleHasAnyPermission(effectiveRole(), [
-        'card:create',
-        'card:update',
-        'card:move',
-        'column:create',
-        'board:update',
-      ]),
+      roleHasAnyPermission(effectiveRole(), ['card:update', 'board:update']),
     );
+    const canMoveCards = computed(() => roleHasAnyPermission(effectiveRole(), ['card:move']));
+    const canCreateColumn = computed(() => roleHasAnyPermission(effectiveRole(), ['column:create']));
+    const canCreateCard = computed(() => roleHasAnyPermission(effectiveRole(), ['card:create']));
     const canComment = computed(() => roleHasAnyPermission(effectiveRole(), ['comment:create']));
     const sortedColumns = computed(() => {
       const b = store.activeBoard();
@@ -127,6 +132,9 @@ export const BoardStore = signalStore(
       effectiveRole,
       permissions,
       canEdit,
+      canMoveCards,
+      canCreateColumn,
+      canCreateCard,
       canComment,
       sortedColumns,
     };
@@ -136,6 +144,9 @@ export const BoardStore = signalStore(
       store,
       api = inject(BoardApiService),
     ) => ({
+      setActiveBoardMemberRole(role: BoardRole | null): void {
+        patchState(store, { activeBoardMemberRole: role });
+      },
       setUser(user: UserProfile | null): void {
         patchState(store, { user });
       },
@@ -146,7 +157,7 @@ export const BoardStore = signalStore(
         patchState(store, { error });
       },
       setActiveBoard(board: BoardDetails | null): void {
-        patchState(store, { activeBoard: board });
+        patchState(store, { activeBoard: board, activeBoardMemberRole: null });
       },
       replaceBoards(boards: BoardSummary[]): void {
         patchState(store, { boards });
@@ -167,7 +178,26 @@ export const BoardStore = signalStore(
         patchState(store, { loading: true, error: null });
         try {
           const board = await firstValueFrom(api.getBoard(id));
-          patchState(store, { activeBoard: normalizeBoard(board), loading: false });
+          patchState(store, { activeBoard: normalizeBoard(board), loading: false, activeBoardMemberRole: null });
+
+          const meId = store.user()?.id;
+          if (!meId) {
+            return;
+          }
+          if (meId === board.ownerId) {
+            patchState(store, { activeBoardMemberRole: 'owner' });
+            return;
+          }
+          // For non-owner users infer role from board members list.
+          try {
+            const members = await firstValueFrom(api.listBoardMembers(id));
+            const mine = members.find((m) => m.id === meId);
+            const mapped: BoardRole | null = mine ? (mine.role as BoardRole) : 'viewer';
+            patchState(store, { activeBoardMemberRole: mapped });
+          } catch {
+            // Keep fallback (viewer) via computed; don't block board load.
+            patchState(store, { activeBoardMemberRole: null });
+          }
         } catch (e) {
           patchState(store, {
             loading: false,
@@ -183,7 +213,24 @@ export const BoardStore = signalStore(
         patchState(store, { loading: true, error: null });
         try {
           const board = await firstValueFrom(api.getBoard(b.id));
-          patchState(store, { activeBoard: normalizeBoard(board), loading: false });
+          patchState(store, { activeBoard: normalizeBoard(board), loading: false, activeBoardMemberRole: store.activeBoardMemberRole() });
+
+          const meId = store.user()?.id;
+          if (!meId) {
+            return;
+          }
+          if (meId === board.ownerId) {
+            patchState(store, { activeBoardMemberRole: 'owner' });
+            return;
+          }
+          try {
+            const members = await firstValueFrom(api.listBoardMembers(board.id));
+            const mine = members.find((m) => m.id === meId);
+            const mapped: BoardRole | null = mine ? (mine.role as BoardRole) : 'viewer';
+            patchState(store, { activeBoardMemberRole: mapped });
+          } catch {
+            patchState(store, { activeBoardMemberRole: store.activeBoardMemberRole() });
+          }
         } catch (e) {
           patchState(store, {
             loading: false,

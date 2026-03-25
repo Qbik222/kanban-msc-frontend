@@ -38,6 +38,11 @@ export const routes: Routes = [
           import('./features/board/board-list.component').then((m) => m.BoardListComponent),
       },
       {
+        path: 'boards/:boardId/settings',
+        loadComponent: () =>
+          import('./features/board/board-settings.component').then((m) => m.BoardSettingsComponent),
+      },
+      {
         path: 'boards/:boardId',
         loadComponent: () =>
           import('./features/board/board.component').then((m) => m.BoardComponent),

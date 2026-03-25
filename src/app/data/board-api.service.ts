@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { BoardDetails, BoardSummary, Card, CardDeadline } from '../models/board.models';
+import { BoardDetails, BoardMemberDto, BoardMemberRole, BoardSummary, Card, CardDeadline } from '../models/board.models';
 
 @Injectable({ providedIn: 'root' })
 export class BoardApiService {
@@ -23,6 +23,22 @@ export class BoardApiService {
 
   inviteBoardMember(boardId: string, body: { userId: string }): Observable<unknown> {
     return this.http.post(`${this.api}/boards/${boardId}/members`, body);
+  }
+
+  listBoardMembers(boardId: string): Observable<BoardMemberDto[]> {
+    return this.http.get<BoardMemberDto[]>(`${this.api}/boards/${boardId}/members`);
+  }
+
+  patchBoardMemberRole(
+    boardId: string,
+    memberUserId: string,
+    body: { role: BoardMemberRole },
+  ): Observable<unknown> {
+    return this.http.patch(`${this.api}/boards/${boardId}/members/${memberUserId}/role`, body);
+  }
+
+  removeBoardMember(boardId: string, memberUserId: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/boards/${boardId}/members/${memberUserId}`);
   }
 
   patchBoard(id: string, body: Partial<{ title: string; projectIds: string[] }>): Observable<BoardSummary> {
