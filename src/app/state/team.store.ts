@@ -2,7 +2,7 @@ import { computed, inject } from '@angular/core';
 import { patchState, signalStore, withComputed, withMethods, withState } from '@ngrx/signals';
 import { firstValueFrom } from 'rxjs';
 import { TeamsApiService } from '../data/teams-api.service';
-import { Team, TeamMemberRole } from '../models/team.models';
+import { Team, TeamMember, TeamMemberDto, TeamMemberRole } from '../models/team.models';
 
 interface TeamState {
   teams: Team[];
@@ -38,14 +38,26 @@ export const TeamStore = signalStore(
     return { teamNameById, hasAdminTeam, adminTeams };
   }),
   withMethods((store, api = inject(TeamsApiService)) => {
+    const mapTeamMemberDtoToTeamMember = (m: TeamMemberDto): TeamMember => ({
+      userId: m.id,
+      role: m.role,
+      name: m.name,
+      email: m.email,
+      boards: m.boards,
+    });
+
     const refreshTeamAndList = async (teamId: string): Promise<void> => {
-      const [team, teams] = await Promise.all([
+      const [team, teams, teamMembers] = await Promise.all([
         firstValueFrom(api.getTeam(teamId)),
         firstValueFrom(api.listTeams()),
+        firstValueFrom(api.listTeamMembers(teamId)),
       ]);
+      const mappedMembers = teamMembers.map(mapTeamMemberDtoToTeamMember);
+      const mappedTeam: Team = { ...team, members: mappedMembers };
+      const currentActiveTeam = store.activeTeam();
       patchState(store, {
         teams,
-        activeTeam: store.activeTeam()?.id === teamId ? team : store.activeTeam(),
+        activeTeam: currentActiveTeam?.id === teamId ? mappedTeam : currentActiveTeam,
       });
     };
 
@@ -104,8 +116,13 @@ export const TeamStore = signalStore(
     async loadTeamDetail(teamId: string): Promise<void> {
       patchState(store, { loading: true, error: null, activeTeam: null });
       try {
-        const team = await firstValueFrom(api.getTeam(teamId));
-        patchState(store, { activeTeam: team, loading: false });
+        const [team, teamMembers] = await Promise.all([
+          firstValueFrom(api.getTeam(teamId)),
+          firstValueFrom(api.listTeamMembers(teamId)),
+        ]);
+        const mappedMembers = teamMembers.map(mapTeamMemberDtoToTeamMember);
+        const mappedTeam: Team = { ...team, members: mappedMembers };
+        patchState(store, { activeTeam: mappedTeam, loading: false });
       } catch (e) {
         patchState(store, {
           loading: false,

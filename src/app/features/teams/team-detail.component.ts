@@ -3,8 +3,11 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { TeamStore } from '../../state/team.store';
-import { TeamMemberRole } from '../../models/team.models';
-import { filter, map } from 'rxjs/operators';
+import { TeamsApiService } from '../../data/teams-api.service';
+import { TeamInviteCandidate, TeamMemberRole } from '../../models/team.models';
+import { HttpErrorResponse } from '@angular/common/http';
+import { Subject, of } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, filter, map, switchMap } from 'rxjs/operators';
 
 @Component({
   selector: 'app-team-detail',
@@ -29,38 +32,76 @@ import { filter, map } from 'rxjs/operators';
 
           @if (team.role === 'admin') {
             <div class="mb-8 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
-              <h2 class="mb-3 text-sm font-medium text-slate-300">Запросити учасника</h2>
-              <p class="mb-2 text-xs text-slate-500">Вкажіть userId користувача (він має бути зареєстрований).</p>
-              <div class="flex flex-wrap gap-2">
-                <input
-                  class="min-w-[12rem] flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
-                  placeholder="User ID"
-                  [(ngModel)]="newMemberUserId"
-                  name="userId"
-                />
-                <button
-                  type="button"
-                  class="rounded bg-emerald-600 px-4 py-2 text-sm text-white hover:bg-emerald-500 disabled:opacity-50"
-                  [disabled]="adding || !newMemberUserId.trim()"
-                  (click)="addMember(team.id)"
-                >
-                  {{ adding ? 'Додавання…' : 'Додати' }}
-                </button>
-              </div>
-            </div>
+              <h2 class="mb-3 text-sm font-medium text-slate-300">Інвайт у команду</h2>
+              <p class="mb-2 text-xs text-slate-500">Пошук користувачів за email-фрагментом</p>
 
-            @if (team.members?.length) {
-              <h2 class="mb-3 text-sm font-medium text-slate-300">Учасники</h2>
-              <ul class="flex flex-col gap-2">
-                @for (m of team.members; track m.userId) {
-                  <li
-                    class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm"
-                  >
-                    <div>
-                      <span class="text-slate-200">{{ m.name || m.email || m.userId }}</span>
-                      <span class="ml-2 text-xs text-slate-500">{{ m.userId }}</span>
-                    </div>
-                    <div class="flex items-center gap-2">
+              @if (inviteSearchBlocked403) {
+                <p class="text-xs text-red-400">Немає прав на пошук кандидатів у цій команді.</p>
+              } @else {
+                <div class="flex flex-col gap-2">
+                  <input
+                    class="min-w-[12rem] flex-1 rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    placeholder="Email fragment"
+                    [(ngModel)]="inviteQuery"
+                    (ngModelChange)="onInviteQueryChange($event)"
+                    [disabled]="inviteSearchLoading || inviteAddLoading"
+                  />
+
+                  @if (inviteSearchLoading) {
+                    <p class="text-xs text-slate-400">Завантаження…</p>
+                  } @else if (inviteQuery.trim().length >= 2) {
+                    @if (inviteCandidates.length) {
+                      <ul class="max-h-48 overflow-auto flex flex-col gap-2">
+                        @for (c of inviteCandidates; track c.id) {
+                          <li>
+                            <button
+                              type="button"
+                              class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-left text-sm text-white hover:bg-slate-800 disabled:opacity-50"
+                              [disabled]="inviteAddLoading"
+                              (click)="inviteMember(team.id, c)"
+                            >
+                              <span class="block text-slate-200">{{ c.name || c.email }}</span>
+                              <span class="block text-xs text-slate-500">{{ c.email }} · {{ c.id }}</span>
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    } @else {
+                      <p class="text-xs text-red-400">нічого не знайдено</p>
+                    }
+                  }
+
+                  @if (inviteSearchError) {
+                    <p class="text-xs text-red-400">{{ inviteSearchError }}</p>
+                  }
+
+                  @if (inviteSuccessMessage) {
+                    <p class="inline-block rounded border border-emerald-800 bg-emerald-900/40 px-2 py-1 text-xs text-emerald-200">
+                      {{ inviteSuccessMessage }}
+                    </p>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <p class="mb-3 text-slate-400">
+              Список учасників доступний усім, але керування (інвайт/зміна ролей) доступне лише адміністратору команди.
+            </p>
+          }
+
+          @if (team.members?.length) {
+            <h2 class="mb-3 text-sm font-medium text-slate-300">Учасники</h2>
+            <ul class="flex flex-col gap-2">
+              @for (m of team.members; track m.userId) {
+                <li
+                  class="flex flex-wrap items-center justify-between gap-2 rounded border border-slate-800 bg-slate-900/80 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <span class="text-slate-200">{{ m.name || m.email || m.userId }}</span>
+                    <span class="ml-2 text-xs text-slate-500">{{ m.userId }}</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    @if (team.role === 'admin') {
                       <select
                         class="rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
                         [ngModel]="m.role"
@@ -78,15 +119,17 @@ import { filter, map } from 'rxjs/operators';
                       >
                         Вилучити
                       </button>
-                    </div>
-                  </li>
-                }
-              </ul>
-            } @else {
-              <p class="text-sm text-slate-500">Список учасників порожній або API не повертає members у відповіді.</p>
-            }
+                    } @else {
+                      <span class="text-xs text-slate-300">
+                        Роль: {{ m.role === 'admin' ? 'адмін' : 'учасник' }}
+                      </span>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
           } @else {
-            <p class="text-slate-400">Керування учасниками доступне лише адміністратору команди.</p>
+            <p class="text-sm text-slate-500">Список учасників порожній або API не повертає members у відповіді.</p>
           }
         } @else {
           <p class="text-slate-400">Команду не знайдено.</p>
@@ -97,14 +140,62 @@ import { filter, map } from 'rxjs/operators';
 })
 export class TeamDetailComponent implements OnDestroy {
   readonly teamStore = inject(TeamStore);
+  private readonly teamsApi = inject(TeamsApiService);
   private readonly route = inject(ActivatedRoute);
 
-  newMemberUserId = '';
-  adding = false;
+  inviteQuery = '';
+  inviteCandidates: TeamInviteCandidate[] = [];
+  inviteSearchLoading = false;
+  inviteAddLoading = false;
+  inviteSearchError: string | null = null;
+  inviteSuccessMessage: string | null = null;
+  inviteSearchBlocked403 = false;
+
+  private teamId: string | null = null;
+  private readonly inviteQueryChanges = new Subject<string>();
+
   removing: string | null = null;
   roleUpdating: string | null = null;
 
   constructor() {
+    this.inviteQueryChanges
+      .pipe(
+        debounceTime(400),
+        map((q) => q.trim()),
+        distinctUntilChanged(),
+        switchMap((q) => {
+          if (!this.teamId || this.inviteSearchBlocked403) {
+            this.inviteSearchLoading = false;
+            return of([]);
+          }
+
+          if (q.length < 2) {
+            this.inviteSearchLoading = false;
+            this.inviteCandidates = [];
+            this.inviteSearchError = null;
+            return of([]);
+          }
+
+          this.inviteSearchLoading = true;
+          this.inviteSearchError = null;
+          return this.teamsApi.inviteSearch(this.teamId, q, 10).pipe(
+            catchError((err: HttpErrorResponse) => {
+              if (err.status === 403) {
+                this.inviteSearchBlocked403 = true;
+              }
+              this.inviteSearchError = err.error?.message ? String(err.error.message) : 'Не вдалося виконати пошук';
+              this.inviteCandidates = [];
+              return of([]);
+            }),
+          );
+        }),
+        takeUntilDestroyed(),
+      )
+      .subscribe((candidates) => {
+        this.inviteCandidates = candidates;
+        this.inviteSearchLoading = false;
+      });
+
     this.route.paramMap
       .pipe(
         takeUntilDestroyed(),
@@ -112,6 +203,12 @@ export class TeamDetailComponent implements OnDestroy {
         filter((id): id is string => !!id),
       )
       .subscribe((id) => {
+        this.teamId = id;
+        this.inviteQuery = '';
+        this.inviteCandidates = [];
+        this.inviteSearchError = null;
+        this.inviteSuccessMessage = null;
+        this.inviteSearchBlocked403 = false;
         void this.teamStore.loadTeamDetail(id);
       });
   }
@@ -120,19 +217,34 @@ export class TeamDetailComponent implements OnDestroy {
     this.teamStore.clearActiveTeam();
   }
 
-  async addMember(teamId: string): Promise<void> {
-    const uid = this.newMemberUserId.trim();
-    if (!uid || this.adding) {
+  onInviteQueryChange(next: string): void {
+    this.inviteSuccessMessage = null;
+    this.inviteSearchError = null;
+    if (this.inviteSearchBlocked403) {
       return;
     }
-    this.adding = true;
+    this.inviteQueryChanges.next(next);
+  }
+
+  async inviteMember(teamId: string, candidate: TeamInviteCandidate): Promise<void> {
+    if (!candidate?.id || this.inviteAddLoading) {
+      return;
+    }
+
+    this.inviteAddLoading = true;
     try {
-      const ok = await this.teamStore.addMember(teamId, uid);
+      const ok = await this.teamStore.addMember(teamId, candidate.id);
       if (ok) {
-        this.newMemberUserId = '';
+        const label = candidate.name || candidate.email || candidate.id;
+        this.inviteSuccessMessage = `Користувач ${label} успішно доданий до команди`;
+        this.inviteQuery = '';
+        this.inviteCandidates = [];
+      } else {
+        // Очистимо помилку в store, щоб не ховати UI інвайту.
+        void this.teamStore.loadTeamDetail(teamId);
       }
     } finally {
-      this.adding = false;
+      this.inviteAddLoading = false;
     }
   }
 

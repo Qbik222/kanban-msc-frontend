@@ -1,13 +1,15 @@
 import { Component, OnDestroy, inject } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
-import { filter, map, switchMap } from 'rxjs/operators';
+import { filter, map, switchMap, tap } from 'rxjs/operators';
 import { firstValueFrom, from } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BoardApiService } from '../../data/board-api.service';
 import { BoardStore } from '../../state/board.store';
+import { TeamStore } from '../../state/team.store';
 import { SocketService } from '../../realtime/socket.service';
 import { Card } from '../../models/board.models';
+import { TeamMember } from '../../models/team.models';
 import { ColumnComponent } from './column.component';
 import { AiAssistantComponent } from './ai-assistant';
 import { FormsModule } from '@angular/forms';
@@ -59,18 +61,51 @@ import { ToastService } from '../../core/toast/toast.service';
             </div>
           }
         </div>
-        <div *canView="['member:invite']" class="mb-3 flex flex-wrap items-center gap-2 text-sm">
-          <span class="text-slate-400">Запросити на дошку (userId, та сама команда):</span>
-          <input
-            type="text"
-            class="w-48 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100"
-            [(ngModel)]="inviteUserId"
-            [disabled]="invitingMember"
-          />
+        <div *canView="['member:invite']" class="mb-3 flex flex-wrap items-center gap-3 text-sm">
+          <span class="text-slate-400">Запросити на дошку:</span>
+
+          <div class="flex flex-col gap-1">
+            <input
+              type="text"
+              class="w-56 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-slate-100 placeholder:text-slate-500"
+              placeholder="Пошук по name/email"
+              [(ngModel)]="inviteSearch"
+              (ngModelChange)="onInviteSearchChange($event)"
+              [disabled]="invitingMember"
+            />
+
+            <select
+              class="w-56 rounded border border-slate-700 bg-slate-900 px-2 py-1 text-sm text-white"
+              [(ngModel)]="inviteSelectedUserId"
+              [disabled]="invitingMember"
+            >
+              <option value="">Оберіть користувача</option>
+              @for (m of inviteFilteredMembers; track m.userId) {
+                <option [value]="m.userId">{{ inviteOptionLabel(m) }}</option>
+              }
+            </select>
+
+            @if (inviteSearch.trim() && inviteFilteredMembers.length === 0) {
+              <p class="text-xs text-red-400">нічого не знайдено</p>
+            }
+
+            @if (invitePillMessage) {
+              @if (invitePillKind === 'success') {
+                <p class="inline-block rounded border border-emerald-800 bg-emerald-900/40 px-2 py-1 text-xs text-emerald-200">
+                  {{ invitePillMessage }}
+                </p>
+              } @else {
+                <p class="inline-block rounded border border-red-800 bg-red-900/40 px-2 py-1 text-xs text-red-200">
+                  {{ invitePillMessage }}
+                </p>
+              }
+            }
+          </div>
+
           <button
             type="button"
-            class="rounded bg-slate-700 px-2 py-1 text-white hover:bg-slate-600 disabled:opacity-50"
-            [disabled]="invitingMember || !inviteUserId.trim()"
+            class="rounded bg-slate-700 px-3 py-1 text-white hover:bg-slate-600 disabled:opacity-50"
+            [disabled]="invitingMember || !inviteSelectedUserId"
             (click)="inviteBoardMember()"
           >
             {{ invitingMember ? '…' : 'Запросити' }}
@@ -107,12 +142,16 @@ import { ToastService } from '../../core/toast/toast.service';
 })
 export class BoardComponent implements OnDestroy {
   readonly boardStore = inject(BoardStore);
+  readonly teamStore = inject(TeamStore);
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(BoardApiService);
   private readonly socket = inject(SocketService);
   private readonly toast = inject(ToastService);
   newColumnTitle = '';
-  inviteUserId = '';
+  inviteSearch = '';
+  inviteSelectedUserId = '';
+  invitePillMessage: string | null = null;
+  invitePillKind: 'success' | 'error' = 'success';
   invitingMember = false;
   creatingColumn = false;
   creatingCardColumnId: string | null = null;
@@ -132,7 +171,17 @@ export class BoardComponent implements OnDestroy {
         switchMap((id) => {
           this.socket.ensureConnected();
           this.socket.joinBoard(id);
-          return from(this.boardStore.loadBoard(id));
+          this.invitePillMessage = null;
+          this.invitePillKind = 'success';
+          this.resetInvite();
+          return from(this.boardStore.loadBoard(id)).pipe(
+            tap(() => {
+              const b = this.boardStore.activeBoard();
+              if (b?.teamId) {
+                void this.teamStore.loadTeamDetail(b.teamId);
+              }
+            }),
+          );
         }),
       )
       .subscribe();
@@ -140,24 +189,113 @@ export class BoardComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.boardStore.setActiveBoard(null);
+    this.teamStore.clearActiveTeam();
   }
 
   async inviteBoardMember(): Promise<void> {
     const board = this.boardStore.activeBoard();
-    const userId = this.inviteUserId.trim();
+    const userId = this.inviteSelectedUserId.trim();
     if (!board || !userId || this.invitingMember) {
+      return;
+    }
+
+    const selectedMember = this.teamStore.activeTeam()?.members?.find((m) => m.userId === userId);
+    const selectedLabel = selectedMember?.name || selectedMember?.email || selectedMember?.userId || userId;
+    this.invitePillMessage = null;
+
+    const meId = this.boardStore.user()?.id;
+    if (meId && meId === userId) {
+      // За бізнес-логікою (і щоб не отримати 4xx з бекенду) сам себе інвайтити не можна.
+      this.toast.show('Неможливо запросити себе', 'error');
       return;
     }
     this.invitingMember = true;
     try {
       await firstValueFrom(this.api.inviteBoardMember(board.id, { userId }));
-      this.inviteUserId = '';
+      this.invitePillKind = 'success';
+      this.invitePillMessage = `Користувач ${selectedLabel} доданий до дошки`;
       this.toast.show('Запрошення надіслано', 'success');
+      this.resetInvite();
+      await this.teamStore.loadTeamDetail(board.teamId);
     } catch (e) {
-      this.toast.show(e instanceof Error ? e.message : 'Не вдалося запросити', 'error');
+      this.invitePillKind = 'error';
+      const msg = e instanceof Error ? e.message : 'Не вдалося запросити';
+      this.invitePillMessage = msg;
+      this.toast.show(msg, 'error');
     } finally {
       this.invitingMember = false;
     }
+  }
+
+  private resetInvite(): void {
+    this.inviteSearch = '';
+    this.inviteSelectedUserId = '';
+  }
+
+  get inviteFilteredMembers(): TeamMember[] {
+    const q = this.inviteSearch.trim().toLowerCase();
+    const candidates = this.inviteCandidates();
+    if (!q) {
+      return candidates;
+    }
+    return candidates.filter((m) => this.matchesInviteQuery(m, q));
+  }
+
+  private inviteCandidates(): TeamMember[] {
+    const team = this.teamStore.activeTeam();
+    const members = team?.members ?? [];
+    const meId = this.boardStore.user()?.id;
+    const boardId = this.boardStore.activeBoard()?.id;
+
+    const byId = new Map<string, TeamMember>();
+    for (const m of members) {
+      if (!m.userId) {
+        continue;
+      }
+      if (meId && m.userId === meId) {
+        continue;
+      }
+
+      // Backend-provided `member.boards` indicates which boards the user already has access to.
+      // For the invite dropdown we show only those who do NOT yet have access to the active board.
+      const hasAccessToActiveBoard = boardId ? m.boards?.some((b) => b.id === boardId) ?? false : false;
+      if (hasAccessToActiveBoard) {
+        continue;
+      }
+
+      byId.set(m.userId, m);
+    }
+    return [...byId.values()];
+  }
+
+  private matchesInviteQuery(member: TeamMember, normalizedQuery: string): boolean {
+    if (!normalizedQuery) {
+      return true;
+    }
+    const name = (member.name ?? '').trim().toLowerCase();
+    const email = (member.email ?? '').trim().toLowerCase();
+    return [name, email].some((v) => v.includes(normalizedQuery));
+  }
+
+  onInviteSearchChange(nextValue: string): void {
+    const q = nextValue.trim().toLowerCase();
+    if (nextValue.trim()) {
+      this.invitePillMessage = null;
+    }
+    if (!this.inviteSelectedUserId) {
+      return;
+    }
+
+    // Якщо вибір більше не входить у filtered list — очищаємо.
+    const list = !q ? this.inviteCandidates() : this.inviteCandidates().filter((m) => this.matchesInviteQuery(m, q));
+    if (!list.some((m) => m.userId === this.inviteSelectedUserId)) {
+      this.inviteSelectedUserId = '';
+    }
+  }
+
+  inviteOptionLabel(m: TeamMember): string {
+    const base = m.name || m.email || m.userId;
+    return `${base} (${m.userId})`;
   }
 
   async createColumn(): Promise<void> {
