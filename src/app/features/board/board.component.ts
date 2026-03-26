@@ -133,6 +133,7 @@ export class BoardComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.boardStore.setActiveBoard(null);
+    this.socket.resetActiveBoard();
   }
 
   async createColumn(): Promise<void> {

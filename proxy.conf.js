@@ -19,20 +19,29 @@ function spaHtmlBypass(req) {
   return undefined;
 }
 
-module.exports = [
-  {
-    context: ['/auth', '/users', '/teams', '/boards', '/columns', '/cards', '/health', '/api'],
-    target: 'http://localhost:3500',
-    secure: false,
-    changeOrigin: true,
-    logLevel: 'silent',
-    bypass: spaHtmlBypass,
-  },
-  {
-    context: '/socket.io',
-    target: 'http://localhost:3500',
+const apiTarget = 'http://localhost:3500';
+
+const apiProxy = {
+  target: apiTarget,
+  secure: false,
+  changeOrigin: true,
+  logLevel: 'silent',
+  bypass: spaHtmlBypass,
+};
+
+module.exports = {
+  '/auth': apiProxy,
+  '/users': apiProxy,
+  '/teams': apiProxy,
+  '/boards': apiProxy,
+  '/columns': apiProxy,
+  '/cards': apiProxy,
+  '/health': apiProxy,
+  '/api': apiProxy,
+  '/socket.io': {
+    target: apiTarget,
     secure: false,
     ws: true,
     changeOrigin: true,
   },
-];
+};
