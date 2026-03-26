@@ -17,6 +17,10 @@ export class TeamsApiService {
     return this.http.post<Team>(`${this.api}/teams`, body);
   }
 
+  patchTeam(teamId: string, body: { name: string }): Observable<Team> {
+    return this.http.patch<Team>(`${this.api}/teams/${teamId}`, body);
+  }
+
   /** Optional detail with members; use if backend exposes GET /teams/:id. */
   getTeam(teamId: string): Observable<Team> {
     return this.http.get<Team>(`${this.api}/teams/${teamId}`);

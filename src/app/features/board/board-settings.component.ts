@@ -45,6 +45,34 @@ import { CanViewDirective } from '../../shared/directives/can-view.directive';
           </div>
         </div>
 
+        <div *canView="['board:update']" class="mb-8 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+          <h2 class="mb-3 text-sm font-medium text-slate-300">Перейменувати дошку</h2>
+          <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+            <label class="flex flex-1 flex-col gap-1 text-xs text-slate-400">
+              Назва
+              <input
+                type="text"
+                class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white placeholder:text-slate-500"
+                placeholder="New board title"
+                [ngModel]="renameTitle || board.title"
+                (ngModelChange)="renameTitle = $event"
+                [disabled]="renamingBoard"
+              />
+            </label>
+            <button
+              type="button"
+              class="rounded bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-600 disabled:opacity-50"
+              [disabled]="renamingBoard || !(renameTitle || '').trim() || (renameTitle || '').trim() === board.title"
+              (click)="renameBoard(board.id, board.title)"
+            >
+              {{ renamingBoard ? 'Збереження…' : 'Зберегти' }}
+            </button>
+          </div>
+          @if (renameError) {
+            <p class="mt-2 text-xs text-red-400">{{ renameError }}</p>
+          }
+        </div>
+
         <div *canView="['member:invite']" class="mb-8 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
           <h2 class="mb-3 text-sm font-medium text-slate-300">Запросити на дошку</h2>
           <p class="mb-2 text-xs text-slate-500">Пошук користувачів команди за name/email</p>
@@ -169,6 +197,10 @@ export class BoardSettingsComponent implements OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly toast = inject(ToastService);
 
+  renameTitle = '';
+  renamingBoard = false;
+  renameError: string | null = null;
+
   members: BoardMemberDto[] = [];
   membersLoading = false;
   membersError: string | null = null;
@@ -212,6 +244,8 @@ export class BoardSettingsComponent implements OnDestroy {
           this.invitePillKind = 'success';
           this.members = [];
           this.membersError = null;
+          this.renameTitle = this.boardStore.activeBoard()?.title ?? '';
+          this.renameError = null;
         }),
         switchMap((id) =>
           of(id).pipe(
@@ -226,6 +260,8 @@ export class BoardSettingsComponent implements OnDestroy {
         if (board?.id !== id) {
           // `loadBoard` is async; wait for it via polling is overkill—just rely on subsequent change detection.
         }
+        // Ensure rename input is synced after board load.
+        this.renameTitle = this.boardStore.activeBoard()?.title ?? this.renameTitle;
         await this.reloadMembers(id);
         const b = this.boardStore.activeBoard();
         if (b?.teamId) {
@@ -251,7 +287,8 @@ export class BoardSettingsComponent implements OnDestroy {
     this.membersLoading = true;
     this.membersError = null;
     try {
-      this.members = await firstValueFrom(this.api.listBoardMembers(boardId));
+      const raw = await firstValueFrom(this.api.listBoardMembers(boardId));
+      this.members = raw.filter((m) => !!m.id);
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Не вдалося завантажити учасників';
       this.membersError = msg;
@@ -304,6 +341,27 @@ export class BoardSettingsComponent implements OnDestroy {
   inviteOptionLabel(m: TeamMember): string {
     const base = m.name || m.email || m.userId;
     return `${base} (${m.userId})`;
+  }
+
+  async renameBoard(boardId: string, currentTitle: string): Promise<void> {
+    const next = this.renameTitle.trim();
+    if (!next || next === currentTitle || this.renamingBoard) {
+      return;
+    }
+    this.renamingBoard = true;
+    this.renameError = null;
+    try {
+      const updated = await firstValueFrom(this.api.patchBoard(boardId, { title: next }));
+      this.boardStore.mergeBoardMetadata(updated);
+      this.boardStore.upsertBoardSummary(updated);
+      this.toast.show('Назву дошки оновлено', 'success');
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Не вдалося перейменувати дошку';
+      this.renameError = msg;
+      this.toast.show(msg, 'error');
+    } finally {
+      this.renamingBoard = false;
+    }
   }
 
   async inviteBoardMember(boardId: string, teamId: string): Promise<void> {

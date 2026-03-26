@@ -247,6 +247,17 @@ export const BoardStore = signalStore(
           activeBoard: { ...cur, ...board, columns: cur.columns },
         });
       },
+      upsertBoardSummary(board: BoardSummary): void {
+        const existing = store.boards();
+        const idx = existing.findIndex((b) => b.id === board.id);
+        if (idx === -1) {
+          patchState(store, { boards: [board, ...existing] });
+          return;
+        }
+        const next = [...existing];
+        next[idx] = { ...next[idx], ...board };
+        patchState(store, { boards: next });
+      },
       setBoardFullSnapshot(board: BoardDetails): void {
         patchState(store, { activeBoard: normalizeBoard(board) });
       },

@@ -46,6 +46,23 @@ export const TeamStore = signalStore(
       boards: m.boards,
     });
 
+    const updateTeamName = (teamId: string, name: string): void => {
+      const teams = store.teams();
+      const idx = teams.findIndex((t) => t.id === teamId);
+      const nextTeams =
+        idx === -1
+          ? teams
+          : (() => {
+              const copy = [...teams];
+              copy[idx] = { ...copy[idx], name };
+              return copy;
+            })();
+
+      const active = store.activeTeam();
+      const nextActive = active?.id === teamId ? { ...active, name } : active;
+      patchState(store, { teams: nextTeams, activeTeam: nextActive });
+    };
+
     const refreshTeamAndList = async (teamId: string): Promise<void> => {
       const [team, teams, teamMembers] = await Promise.all([
         firstValueFrom(api.getTeam(teamId)),
@@ -128,6 +145,25 @@ export const TeamStore = signalStore(
           loading: false,
           error: e instanceof Error ? e.message : 'Failed to load team',
         });
+      }
+    },
+    async renameTeam(teamId: string, name: string): Promise<boolean> {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        return false;
+      }
+      patchState(store, { error: null, loading: true });
+      try {
+        const updated = await firstValueFrom(api.patchTeam(teamId, { name: trimmed }));
+        updateTeamName(teamId, updated.name);
+        patchState(store, { loading: false });
+        return true;
+      } catch (e) {
+        patchState(store, {
+          loading: false,
+          error: e instanceof Error ? e.message : 'Failed to rename team',
+        });
+        return false;
       }
     },
     async addMember(teamId: string, userId: string): Promise<boolean> {

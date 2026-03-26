@@ -6,6 +6,7 @@ import { TeamStore } from '../../state/team.store';
 import { TeamsApiService } from '../../data/teams-api.service';
 import { TeamInviteCandidate, TeamMemberRole } from '../../models/team.models';
 import { HttpErrorResponse } from '@angular/common/http';
+import { ToastService } from '../../core/toast/toast.service';
 import { Subject, of } from 'rxjs';
 import { catchError, debounceTime, distinctUntilChanged, filter, map, switchMap } from 'rxjs/operators';
 
@@ -31,6 +32,33 @@ import { catchError, debounceTime, distinctUntilChanged, filter, map, switchMap 
           </p>
 
           @if (team.role === 'admin') {
+            <div class="mb-8 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
+              <h2 class="mb-3 text-sm font-medium text-slate-300">Перейменувати команду</h2>
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <label class="flex flex-1 flex-col gap-1 text-xs text-slate-400">
+                  Назва
+                  <input
+                    class="w-full rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white"
+                    placeholder="New team name"
+                    [ngModel]="renameTeamName || team.name"
+                    (ngModelChange)="renameTeamName = $event"
+                    [disabled]="renamingTeam"
+                  />
+                </label>
+                <button
+                  type="button"
+                  class="rounded bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-600 disabled:opacity-50"
+                  [disabled]="renamingTeam || !(renameTeamName || '').trim() || (renameTeamName || '').trim() === team.name"
+                  (click)="renameTeam(team.id, team.name)"
+                >
+                  {{ renamingTeam ? 'Збереження…' : 'Зберегти' }}
+                </button>
+              </div>
+              @if (renameTeamError) {
+                <p class="mt-2 text-xs text-red-400">{{ renameTeamError }}</p>
+              }
+            </div>
+
             <div class="mb-8 rounded-lg border border-slate-800 bg-slate-900/60 p-4">
               <h2 class="mb-3 text-sm font-medium text-slate-300">Інвайт у команду</h2>
               <p class="mb-2 text-xs text-slate-500">Пошук користувачів за email-фрагментом</p>
@@ -142,6 +170,11 @@ export class TeamDetailComponent implements OnDestroy {
   readonly teamStore = inject(TeamStore);
   private readonly teamsApi = inject(TeamsApiService);
   private readonly route = inject(ActivatedRoute);
+  private readonly toast = inject(ToastService);
+
+  renameTeamName = '';
+  renamingTeam = false;
+  renameTeamError: string | null = null;
 
   inviteQuery = '';
   inviteCandidates: TeamInviteCandidate[] = [];
@@ -209,12 +242,34 @@ export class TeamDetailComponent implements OnDestroy {
         this.inviteSearchError = null;
         this.inviteSuccessMessage = null;
         this.inviteSearchBlocked403 = false;
+        this.renameTeamError = null;
         void this.teamStore.loadTeamDetail(id);
       });
   }
 
   ngOnDestroy(): void {
     this.teamStore.clearActiveTeam();
+  }
+
+  async renameTeam(teamId: string, currentName: string): Promise<void> {
+    const next = this.renameTeamName.trim();
+    if (!next || next === currentName || this.renamingTeam) {
+      return;
+    }
+    this.renamingTeam = true;
+    this.renameTeamError = null;
+    try {
+      const ok = await this.teamStore.renameTeam(teamId, next);
+      if (!ok) {
+        this.renameTeamError = this.teamStore.error() ?? 'Не вдалося перейменувати команду';
+        this.toast.show(this.renameTeamError, 'error');
+        return;
+      }
+      this.renameTeamName = next;
+      this.toast.show('Назву команди оновлено', 'success');
+    } finally {
+      this.renamingTeam = false;
+    }
   }
 
   onInviteQueryChange(next: string): void {
