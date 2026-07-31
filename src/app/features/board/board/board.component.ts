@@ -4,18 +4,18 @@ import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { filter, map, switchMap, tap } from 'rxjs/operators';
 import { firstValueFrom, from } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { BoardApiService } from '../../data/board-api.service';
-import { BoardStore } from '../../state/board.store';
-import { TeamStore } from '../../state/team.store';
-import { SocketService } from '../../realtime/socket.service';
-import { Card } from '../../models/board.models';
-import { TeamMember } from '../../models/team.models';
-import { ColumnComponent } from './column.component';
-import { AiAssistantComponent } from './ai-assistant';
+import { BoardApiService } from '../../../data/board-api.service';
+import { BoardStore } from '../../../state/board.store';
+import { TeamStore } from '../../../state/team.store';
+import { SocketService } from '../../../realtime/socket.service';
+import { Card } from '../../../models/board.models';
+import { TeamMember } from '../../../models/team.models';
+import { ColumnComponent } from '../column/column.component';
+import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
 import { FormsModule } from '@angular/forms';
-import { CardModalComponent, CardModalSavePayload } from './card-modal.component';
-import { CanViewDirective } from '../../shared/directives/can-view.directive';
-import { ToastService } from '../../core/toast/toast.service';
+import { CardModalComponent, CardModalSavePayload } from '../card-modal/card-modal.component';
+import { CanViewDirective } from '../../../shared/directives/can-view.directive';
+import { ToastService } from '../../../core/toast/toast.service';
 
 @Component({
   selector: 'app-board',
@@ -29,74 +29,8 @@ import { ToastService } from '../../core/toast/toast.service';
     CanViewDirective,
     RouterLink,
   ],
-  template: `
-    <div class="relative flex h-[calc(100vh-8rem)] flex-col">
-      @if (boardStore.loading() && !boardStore.activeBoard()) {
-        <p class="text-slate-400">Loading board…</p>
-      } @else if (boardStore.error()) {
-        <p class="text-red-400">{{ boardStore.error() }}</p>
-      } @else if (boardStore.activeBoard()) {
-        <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 class="text-xl font-semibold text-white">{{ boardStore.activeBoard()!.title }}</h1>
-            <p class="mt-0.5 text-xs text-slate-500">team: {{ boardStore.activeBoard()!.teamId }}</p>
-          </div>
-          <div class="flex items-center gap-2">
-            <a
-              class="rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-800"
-              [routerLink]="['/boards', boardStore.activeBoard()!.id, 'settings']"
-            >
-              Settings
-            </a>
-            @if (boardStore.canCreateColumn()) {
-              <input
-                type="text"
-                class="w-56 rounded border border-slate-700 bg-slate-900 px-3 py-1.5 text-sm text-slate-100 placeholder:text-slate-500 focus:border-emerald-500 focus:outline-none"
-                placeholder="Add column title"
-                [(ngModel)]="newColumnTitle"
-                [disabled]="creatingColumn"
-                (keydown.enter)="createColumn()"
-              />
-              <button
-                type="button"
-                class="rounded bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-                [disabled]="creatingColumn || !newColumnTitle.trim()"
-                (click)="createColumn()"
-              >
-                {{ creatingColumn ? 'Adding…' : 'Add column' }}
-              </button>
-            }
-          </div>
-        </div>
-        <div cdkDropListGroup class="flex min-w-full flex-1 gap-4 overflow-x-auto pb-4">
-          @for (col of boardStore.sortedColumns(); track col.id) {
-            <app-column
-              class="shrink-0"
-              [column]="col"
-              [canCreateCard]="boardStore.canCreateCard()"
-              [canMoveCards]="boardStore.canMoveCards()"
-              [creatingCard]="creatingCardColumnId === col.id"
-              [showSkeleton]="skeletonColumnId === col.id && !!skeletonCardId"
-              [skeletonCardId]="skeletonCardId"
-              [skeletonTitle]="skeletonTitle"
-              [skeletonStartDate]="skeletonStartDate"
-              [skeletonEndDate]="skeletonEndDate"
-              (addCard)="onAddCard(col.id)"
-              (openCard)="openCard($event)"
-              (skeletonTitleChange)="skeletonTitle = $event"
-              (skeletonStartDateChange)="skeletonStartDate = $event"
-              (skeletonEndDateChange)="skeletonEndDate = $event"
-              (saveSkeleton)="saveSkeleton()"
-              (cancelSkeleton)="cancelSkeleton()"
-              (dropped)="onDrop($event, col.id)"
-            />
-          }
-        </div>
-      }
-      <app-ai-assistant />
-      <app-card-modal [card]="activeModalCard()" (close)="closeCardModal()" (save)="saveCardModal($event)" />
-    </div>
-  `,
+  templateUrl: './board.component.html',
+  styleUrl: './board.component.scss',
 })
 export class BoardComponent implements OnDestroy {
   readonly boardStore = inject(BoardStore);

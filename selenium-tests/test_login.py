@@ -30,7 +30,7 @@ def test_successful_login(driver):
 
     assert "/teams" in driver.current_url
     heading = driver.find_element(By.TAG_NAME, "h1")
-    assert "Мої команди" in heading.text
+    assert "My teams" in heading.text
 
 
 def test_failed_login_wrong_password(driver):
@@ -60,4 +60,4 @@ def test_navigate_to_boards_after_login(driver):
 
     assert "/boards" in driver.current_url
     heading = driver.find_element(By.TAG_NAME, "h1")
-    assert "Дошки" in heading.text
+    assert "Boards" in heading.text

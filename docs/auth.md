@@ -44,8 +44,8 @@
 | Тости, редірект на логін при 401 з API | `src/app/core/interceptors/http-error.interceptor.ts` |
 | Захист маршрутів «тільки для залогінених» | `src/app/core/guards/auth.guard.ts` |
 | Захист `/login` і `/register`: не пускати залогіненого | `src/app/core/guards/anonymous.guard.ts` |
-| Форма входу | `src/app/features/auth/login.component.ts` |
-| Шапка, logout, підвантаження профілю | `src/app/features/shell/shell.component.ts` |
+| Форма входу | `src/app/features/auth/login/login.component.ts` |
+| Шапка, logout, підвантаження профілю | `src/app/features/shell/shell/shell.component.ts` |
 
 ---
 

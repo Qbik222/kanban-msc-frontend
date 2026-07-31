@@ -1,14 +1,4 @@
-import { Component, EventEmitter, Input, Output } from '@angular/core';
-import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
-import { FormsModule } from '@angular/forms';
-import { Column, Card } from '../../models/board.models';
-import { CardComponent } from './card.component';
 
-@Component({
-  selector: 'app-column',
-  standalone: true,
-  imports: [DragDropModule, CardComponent, FormsModule],
-  template: `
     <div
       class="group flex h-full min-h-[min(70vh,640px)] w-72 shrink-0 flex-col rounded-lg border border-slate-800 bg-slate-900/60"
     >
@@ -18,7 +8,7 @@ import { CardComponent } from './card.component';
           type="button"
           class="rounded px-1.5 py-0.5 text-sm text-slate-400 opacity-0 transition hover:bg-slate-800 hover:text-white group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
           [disabled]="!canCreateCard || creatingCard"
-          [title]="!canCreateCard ? 'Немає прав створювати картки' : ''"
+          [title]="!canCreateCard ? 'No permission to create cards' : ''"
           (click)="addCard.emit()"
         >
           +
@@ -29,7 +19,7 @@ import { CardComponent } from './card.component';
         [id]="column.id"
         [cdkDropListData]="column.cards"
         [cdkDropListDisabled]="!canMoveCards"
-        [title]="!canMoveCards ? 'Немає прав переміщати картки' : ''"
+        [title]="!canMoveCards ? 'No permission to move cards' : ''"
         class="flex flex-1 flex-col gap-2 overflow-y-auto p-2"
         [class.cursor-not-allowed]="!canMoveCards"
         [class.opacity-75]="!canMoveCards"
@@ -80,7 +70,7 @@ import { CardComponent } from './card.component';
               cdkDrag
               [cdkDragData]="c"
               [cdkDragDisabled]="!canMoveCards"
-              [title]="!canMoveCards ? 'Немає прав переміщати картки' : ''"
+              [title]="!canMoveCards ? 'No permission to move cards' : ''"
               class="active:cursor-grabbing"
               [class.cursor-grab]="canMoveCards"
               [class.cursor-not-allowed]="!canMoveCards"
@@ -94,32 +84,11 @@ import { CardComponent } from './card.component';
           type="button"
           class="mt-1 rounded border border-dashed border-slate-700 px-2 py-2 text-left text-xs text-slate-400 opacity-0 transition hover:border-slate-500 hover:text-slate-200 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
           [disabled]="!canCreateCard || creatingCard"
-          [title]="!canCreateCard ? 'Немає прав створювати картки' : ''"
+          [title]="!canCreateCard ? 'No permission to create cards' : ''"
           (click)="addCard.emit()"
         >
           + Add card
         </button>
       </div>
     </div>
-  `,
-})
-export class ColumnComponent {
-  @Input({ required: true }) column!: Column;
-  @Input() canCreateCard = false;
-  @Input() canMoveCards = false;
-  @Input() creatingCard = false;
-  @Input() showSkeleton = false;
-  @Input() skeletonCardId: string | null = null;
-  @Input() skeletonTitle = '';
-  @Input() skeletonStartDate = '';
-  @Input() skeletonEndDate = '';
-
-  @Output() dropped = new EventEmitter<CdkDragDrop<Card[]>>();
-  @Output() addCard = new EventEmitter<void>();
-  @Output() openCard = new EventEmitter<Card>();
-  @Output() skeletonTitleChange = new EventEmitter<string>();
-  @Output() skeletonStartDateChange = new EventEmitter<string>();
-  @Output() skeletonEndDateChange = new EventEmitter<string>();
-  @Output() saveSkeleton = new EventEmitter<void>();
-  @Output() cancelSkeleton = new EventEmitter<void>();
-}
+  

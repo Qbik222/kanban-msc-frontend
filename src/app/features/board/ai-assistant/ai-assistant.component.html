@@ -1,0 +1,61 @@
+
+    <div
+      class="fixed bottom-4 right-4 z-50 w-[min(100vw-2rem,22rem)] rounded-lg border border-slate-700 bg-slate-900 shadow-xl"
+    >
+      <button
+        type="button"
+        class="flex w-full items-center justify-between border-b border-slate-800 px-3 py-2 text-left text-sm font-medium text-white"
+        (click)="open.set(!open())"
+      >
+        AI Assistant
+        <span class="text-slate-500">{{ open() ? '−' : '+' }}</span>
+      </button>
+      @if (open()) {
+        <div class="border-b border-slate-800 p-3">
+          <textarea
+            class="mb-1 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-400"
+            rows="2"
+            disabled
+            placeholder="Describe your task in natural language…"
+          ></textarea>
+          <p class="text-[10px] text-slate-500">Natural language input — coming in a future version</p>
+        </div>
+        <div class="max-h-64 overflow-auto border-b border-slate-800 p-3">
+          <p class="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Context</p>
+          <pre class="whitespace-pre-wrap break-words font-mono text-[10px] leading-relaxed text-slate-300">{{
+            bridge.getBoardContext()
+          }}</pre>
+        </div>
+        <ng-container *canView="['card:move', 'card:update', 'card:create', 'card:delete']">
+          <div class="p-2">
+            <p class="mb-1 text-[10px] uppercase tracking-wide text-slate-500">Structured actions</p>
+            <textarea
+              class="mb-2 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1 font-mono text-[10px] text-slate-200"
+              rows="3"
+              [(ngModel)]="payloadJson"
+              placeholder='{"cardId":"...","targetColumnId":"...","newOrder":0}'
+            ></textarea>
+            <div class="flex gap-2">
+              <select
+                class="flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-white"
+                [(ngModel)]="action"
+              >
+                <option value="moveCard">moveCard</option>
+                <option value="updateCard">updateCard</option>
+                <option value="createCard">createCard</option>
+                <option value="deleteCard">deleteCard</option>
+              </select>
+              <button
+                type="button"
+                class="rounded bg-emerald-700 px-2 py-1 text-xs text-white hover:bg-emerald-600 disabled:opacity-50"
+                [disabled]="running() || !canRunSelectedAction()"
+                (click)="run()"
+              >
+                {{ running() ? '…' : 'Run' }}
+              </button>
+            </div>
+          </div>
+        </ng-container>
+      }
+    </div>
+  

@@ -7,6 +7,7 @@ import { ToastService } from '../core/toast/toast.service';
 import { BoardDetails, BoardSummary, Card, Column } from '../models/board.models';
 import { BoardStore } from '../state/board.store';
 
+
 @Injectable({ providedIn: 'root' })
 export class SocketService {
   private readonly auth = inject(AuthService);
@@ -24,7 +25,9 @@ export class SocketService {
     effect(() => {
       const boardId = this.activeBoardId;
       const token = this.auth.getAccessToken();
+      console.log('effect', boardId, token);
       if (!boardId || !token) {
+        console.log('not joined', boardId, token);
         return;
       }
       this.tryJoinActiveBoard(false);
@@ -32,6 +35,7 @@ export class SocketService {
   }
 
   ensureConnected(): void {
+    console.log('ensureConnected', this.socket?.connected);
     if (this.socket?.connected) {
       return;
     }

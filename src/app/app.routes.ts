@@ -6,46 +6,46 @@ export const routes: Routes = [
   {
     path: 'login',
     loadComponent: () =>
-      import('./features/auth/login.component').then((m) => m.LoginComponent),
+      import('./features/auth/login/login.component').then((m) => m.LoginComponent),
     canActivate: [anonymousGuard],
   },
   {
     path: 'register',
     loadComponent: () =>
-      import('./features/auth/register.component').then((m) => m.RegisterComponent),
+      import('./features/auth/register/register.component').then((m) => m.RegisterComponent),
     canActivate: [anonymousGuard],
   },
   {
     path: '',
     loadComponent: () =>
-      import('./features/shell/shell.component').then((m) => m.ShellComponent),
+      import('./features/shell/shell/shell.component').then((m) => m.ShellComponent),
     canActivate: [authGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'teams' },
       {
         path: 'teams',
         loadComponent: () =>
-          import('./features/teams/teams-list.component').then((m) => m.TeamsListComponent),
+          import('./features/teams/teams-list/teams-list.component').then((m) => m.TeamsListComponent),
       },
       {
         path: 'teams/:teamId',
         loadComponent: () =>
-          import('./features/teams/team-detail.component').then((m) => m.TeamDetailComponent),
+          import('./features/teams/team-detail/team-detail.component').then((m) => m.TeamDetailComponent),
       },
       {
         path: 'boards',
         loadComponent: () =>
-          import('./features/board/board-list.component').then((m) => m.BoardListComponent),
+          import('./features/board/board-list/board-list.component').then((m) => m.BoardListComponent),
       },
       {
         path: 'boards/:boardId/settings',
         loadComponent: () =>
-          import('./features/board/board-settings.component').then((m) => m.BoardSettingsComponent),
+          import('./features/board/board-settings/board-settings.component').then((m) => m.BoardSettingsComponent),
       },
       {
         path: 'boards/:boardId',
         loadComponent: () =>
-          import('./features/board/board.component').then((m) => m.BoardComponent),
+          import('./features/board/board/board.component').then((m) => m.BoardComponent),
       },
     ],
   },
