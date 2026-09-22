@@ -18,6 +18,7 @@ export interface Card {
   columnId: string;
   boardId: string;
   isDeleted: boolean;
+  taskComplete: boolean;
   assigneeId?: string;
   deadline?: CardDeadline;
   projectIds: string[];

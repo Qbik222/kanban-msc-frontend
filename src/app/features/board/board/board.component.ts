@@ -47,6 +47,7 @@ export class BoardComponent implements OnDestroy {
   skeletonStartDate = '';
   skeletonEndDate = '';
   selectedCardId: string | null = null;
+  togglingCardIds: ReadonlySet<string> = new Set();
 
   constructor() {
     this.route.paramMap
@@ -189,6 +190,30 @@ export class BoardComponent implements OnDestroy {
       );
     } catch {
       this.boardStore.setActiveBoard(previous);
+    }
+  }
+
+  async toggleCardComplete(card: Card): Promise<void> {
+    if (
+      !this.boardStore.permissions().has('card:update') ||
+      this.togglingCardIds.has(card.id)
+    ) {
+      return;
+    }
+
+    this.togglingCardIds = new Set(this.togglingCardIds).add(card.id);
+    this.boardStore.setError(null);
+    try {
+      const updated = await firstValueFrom(
+        this.api.patchCard(card.id, { taskComplete: !card.taskComplete }),
+      );
+      this.boardStore.upsertCard(updated);
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update task status');
+    } finally {
+      const nextTogglingCardIds = new Set(this.togglingCardIds);
+      nextTogglingCardIds.delete(card.id);
+      this.togglingCardIds = nextTogglingCardIds;
     }
   }
 

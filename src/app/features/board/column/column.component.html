@@ -76,7 +76,13 @@
               [class.cursor-not-allowed]="!canMoveCards"
               [class.opacity-60]="!canMoveCards"
             >
-              <app-card [card]="c" (clicked)="openCard.emit(c)" />
+              <app-card
+                [card]="c"
+                [canToggleComplete]="canUpdateCards"
+                [togglingComplete]="togglingCardIds.has(c.id)"
+                (clicked)="openCard.emit(c)"
+                (toggleComplete)="toggleCardComplete.emit(c)"
+              />
             </div>
           }
         }

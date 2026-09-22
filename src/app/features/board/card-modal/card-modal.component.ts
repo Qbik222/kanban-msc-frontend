@@ -17,6 +17,9 @@ export interface CardModalSavePayload {
   styleUrl: './card-modal.component.scss',
 })
 export class CardModalComponent {
+  @Input() canToggleComplete = false;
+  @Input() togglingComplete = false;
+
   @Input()
   set card(value: Card | null) {
     this._card = value;
@@ -33,6 +36,7 @@ export class CardModalComponent {
 
   @Output() close = new EventEmitter<void>();
   @Output() save = new EventEmitter<CardModalSavePayload>();
+  @Output() toggleComplete = new EventEmitter<Card>();
 
   private _card: Card | null = null;
 

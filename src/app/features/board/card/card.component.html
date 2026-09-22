@@ -1,31 +1,57 @@
 
     <article
-      class="rounded-md border border-slate-700 bg-slate-950/80 p-3 shadow-sm transition hover:border-slate-500"
+      class="relative rounded-md border bg-slate-950/80 p-3 shadow-sm transition"
+      [class]="card.taskComplete
+        ? 'border-emerald-500 hover:border-emerald-400'
+        : 'border-slate-700 hover:border-slate-500'"
       (click)="clicked.emit()"
     >
-      <h3 class="font-medium text-slate-100">{{ card.title }}</h3>
-      @if (card.description) {
-        <p class="mt-1 line-clamp-3 text-xs text-slate-400">{{ card.description }}</p>
-      }
-      <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
-        @if (card.priority) {
-          <span
-            class="rounded px-1.5 py-0.5 uppercase tracking-wide"
-            [class.bg-amber-900]="card.priority === 'high'"
-            [class.bg-slate-800]="card.priority !== 'high'"
-            >{{ card.priority }}</span>
+      <div
+        class="pr-8 transition"
+        [class.opacity-50]="card.taskComplete"
+        [class.brightness-75]="card.taskComplete"
+      >
+        <h3 class="font-medium text-slate-100">{{ card.title }}</h3>
+        @if (card.description) {
+          <p class="mt-1 line-clamp-3 text-xs text-slate-400">{{ card.description }}</p>
         }
-        @if (card.projectIds.length) {
-          <span>{{ card.projectIds.length }} projects</span>
-        }
-        @if (card.deadline?.startDate && card.deadline?.endDate) {
-          <span>{{ card.deadline?.startDate | date: 'MMM d' }} - {{ card.deadline?.endDate | date: 'MMM d' }}</span>
-        } @else if (card.deadline?.startDate) {
-          <span>Start {{ card.deadline?.startDate | date: 'MMM d' }}</span>
-        } @else if (card.deadline?.endDate) {
-          <span>Due {{ card.deadline?.endDate | date: 'MMM d' }}</span>
-        }
-        <span>{{ card.comments.length }} comments</span>
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
+          @if (card.priority) {
+            <span
+              class="rounded px-1.5 py-0.5 uppercase tracking-wide"
+              [class.bg-amber-900]="card.priority === 'high'"
+              [class.bg-slate-800]="card.priority !== 'high'"
+              >{{ card.priority }}</span>
+          }
+          @if (card.projectIds.length) {
+            <span>{{ card.projectIds.length }} projects</span>
+          }
+          @if (card.deadline?.startDate && card.deadline?.endDate) {
+            <span>{{ card.deadline?.startDate | date: 'MMM d' }} - {{ card.deadline?.endDate | date: 'MMM d' }}</span>
+          } @else if (card.deadline?.startDate) {
+            <span>Start {{ card.deadline?.startDate | date: 'MMM d' }}</span>
+          } @else if (card.deadline?.endDate) {
+            <span>Due {{ card.deadline?.endDate | date: 'MMM d' }}</span>
+          }
+          <span>{{ card.comments.length }} comments</span>
+        </div>
       </div>
+      <button
+        type="button"
+        class="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+        [class]="card.taskComplete
+          ? 'bg-emerald-500 hover:bg-emerald-400'
+          : 'border border-white bg-transparent hover:bg-white/10'"
+        [disabled]="!canToggleComplete || togglingComplete"
+        [attr.aria-label]="card.taskComplete ? 'Mark task as incomplete' : 'Mark task as complete'"
+        [title]="!canToggleComplete ? 'No permission to update cards' : (card.taskComplete ? 'Mark as incomplete' : 'Mark as complete')"
+        (pointerdown)="$event.stopPropagation()"
+        (click)="$event.stopPropagation(); toggleComplete.emit()"
+      >
+        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+          <circle cx="12" cy="12" r="9"></circle>
+          <path d="m8 12 2.5 2.5L16 9"></path>
+        </svg>
+      </button>
     </article>
   

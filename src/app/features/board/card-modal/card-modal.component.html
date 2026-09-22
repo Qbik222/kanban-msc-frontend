@@ -2,7 +2,8 @@
     @if (card) {
       <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" (click)="close.emit()">
         <div
-          class="w-full max-w-2xl rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+          class="w-full max-w-2xl rounded-xl border bg-slate-900 p-5 shadow-2xl transition"
+          [class]="card.taskComplete ? 'border-emerald-500' : 'border-slate-700'"
           (click)="$event.stopPropagation()"
         >
           <div class="mb-4 flex items-center justify-between">
@@ -55,22 +56,35 @@
               </label>
             </div>
           </div>
-          <div class="mt-5 flex justify-end gap-2">
+          <div class="mt-5 flex items-center justify-between gap-2">
             <button
               type="button"
-              class="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:text-white"
-              (click)="close.emit()"
+              class="rounded px-3 py-1.5 text-sm text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+              [class]="card.taskComplete
+                ? 'bg-emerald-600 hover:bg-emerald-500'
+                : 'bg-slate-600 hover:bg-slate-500'"
+              [disabled]="!canToggleComplete || togglingComplete"
+              (click)="toggleComplete.emit(card)"
             >
-              Cancel
+              {{ card.taskComplete ? 'Completed' : 'Complete the task' }}
             </button>
-            <button
-              type="button"
-              class="rounded bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600"
-              [disabled]="!draftTitle.trim()"
-              (click)="submit()"
-            >
-              Save
-            </button>
+            <div class="flex gap-2">
+              <button
+                type="button"
+                class="rounded border border-slate-700 px-3 py-1.5 text-sm text-slate-300 hover:text-white"
+                (click)="close.emit()"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="rounded bg-emerald-700 px-3 py-1.5 text-sm text-white hover:bg-emerald-600"
+                [disabled]="!draftTitle.trim()"
+                (click)="submit()"
+              >
+                Save
+              </button>
+            </div>
           </div>
         </div>
       </div>

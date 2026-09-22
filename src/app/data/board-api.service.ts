@@ -87,6 +87,7 @@ export class BoardApiService {
         assigneeId: string;
         projectIds: string[];
         deadline: CardDeadline;
+        taskComplete: boolean;
       }>,
   ): Observable<Card> {
     return this.http.patch<Card>(`${this.api}/cards/${id}`, body);

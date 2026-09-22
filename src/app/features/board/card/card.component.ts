@@ -11,5 +11,8 @@ import { Card } from '../../../models/board.models';
 })
 export class CardComponent {
   @Input({ required: true }) card!: Card;
+  @Input() canToggleComplete = false;
+  @Input() togglingComplete = false;
   @Output() clicked = new EventEmitter<void>();
+  @Output() toggleComplete = new EventEmitter<void>();
 }

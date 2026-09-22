@@ -15,7 +15,9 @@ export class ColumnComponent {
   @Input({ required: true }) column!: Column;
   @Input() canCreateCard = false;
   @Input() canMoveCards = false;
+  @Input() canUpdateCards = false;
   @Input() creatingCard = false;
+  @Input() togglingCardIds: ReadonlySet<string> = new Set();
   @Input() showSkeleton = false;
   @Input() skeletonCardId: string | null = null;
   @Input() skeletonTitle = '';
@@ -25,6 +27,7 @@ export class ColumnComponent {
   @Output() dropped = new EventEmitter<CdkDragDrop<Card[]>>();
   @Output() addCard = new EventEmitter<void>();
   @Output() openCard = new EventEmitter<Card>();
+  @Output() toggleCardComplete = new EventEmitter<Card>();
   @Output() skeletonTitleChange = new EventEmitter<string>();
   @Output() skeletonStartDateChange = new EventEmitter<string>();
   @Output() skeletonEndDateChange = new EventEmitter<string>();
