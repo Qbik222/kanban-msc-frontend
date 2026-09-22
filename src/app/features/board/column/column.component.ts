@@ -3,11 +3,12 @@ import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { FormsModule } from '@angular/forms';
 import { BoardMemberDto, Column, Card } from '../../../models/board.models';
 import { CardComponent } from '../card/card.component';
+import { UserMentionComponent } from '../../../shared/user-mention/user-mention.component';
 
 @Component({
   selector: 'app-column',
   standalone: true,
-  imports: [DragDropModule, CardComponent, FormsModule],
+  imports: [DragDropModule, CardComponent, FormsModule, UserMentionComponent],
   templateUrl: './column.component.html',
   styleUrl: './column.component.scss',
 })

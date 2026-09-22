@@ -11,7 +11,24 @@
           (click)="$event.stopPropagation(); dismissOverlays()"
         >
           <div class="mb-5 flex items-center justify-between">
-            <h2 class="text-lg font-semibold text-white">Card details</h2>
+            <div class="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                class="flex size-8 shrink-0 items-center justify-center rounded-full border-2 transition disabled:cursor-not-allowed disabled:opacity-50"
+                [class]="card.taskComplete
+                  ? 'border-emerald-300 bg-emerald-500 text-white shadow-sm hover:bg-emerald-400'
+                  : 'border-white/80 bg-transparent text-white/80 hover:border-white hover:bg-white/10 hover:text-white'"
+                [disabled]="!canToggleComplete || togglingComplete"
+                [attr.aria-label]="card.taskComplete ? 'Mark task as incomplete' : 'Mark task as complete'"
+                [title]="!canToggleComplete ? 'No permission to update cards' : (card.taskComplete ? 'Mark as incomplete' : 'Mark as complete')"
+                (click)="toggleComplete.emit(card)"
+              >
+                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12.5 9.5 17 19 7"></path>
+                </svg>
+              </button>
+              <h2 class="truncate text-lg font-semibold text-white">Card details</h2>
+            </div>
             <div class="flex items-center gap-3">
               @if (canArchive || canPurge) {
                 <div class="relative" (click)="$event.stopPropagation()">
@@ -62,8 +79,15 @@
               <button type="button" class="text-sm text-slate-400 hover:text-white" (click)="close.emit()">Close</button>
             </div>
           </div>
-          <div class="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-4 text-sm">
-            <span class="text-slate-400">Title</span>
+          <div class="grid grid-cols-[9.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-4 text-sm">
+            <span class="flex items-center gap-2 text-slate-400">
+              <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6V4h16v2"></path>
+                <path d="M12 4v16"></path>
+                <path d="M8 20h8"></path>
+              </svg>
+              Title
+            </span>
             <input
               class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white read-only:text-slate-300"
               [ngModel]="draftTitle"
@@ -76,27 +100,30 @@
               #titleInput
             />
 
-            <span class="text-slate-400">Assignee</span>
+            <span class="flex items-center gap-2 text-slate-400">
+              <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="12" cy="8" r="3"></circle>
+                <path d="M5 19a7 7 0 0 1 14 0"></path>
+              </svg>
+              Assignee
+            </span>
             <div class="relative min-w-0">
               <button
                 type="button"
                 class="flex min-w-0 items-center gap-3 rounded-md text-left hover:text-white"
                 (click)="$event.stopPropagation(); assigneeMenuOpen = !assigneeMenuOpen"
               >
-                <span
-                  class="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-                  [class]="selectedMember ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'"
-                >
-                  @if (assigneeInitial) {
-                    {{ assigneeInitial }}
-                  } @else {
+                @if (selectedMember) {
+                  <app-user-mention class="text-slate-100" [user]="selectedMember" size="md" />
+                } @else {
+                  <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-slate-300">
                     <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                       <circle cx="12" cy="8" r="3"></circle>
                       <path d="M5 19a7 7 0 0 1 14 0"></path>
                     </svg>
-                  }
-                </span>
-                <span class="min-w-0 truncate text-slate-100">{{ assigneeLabel }}</span>
+                  </span>
+                  <span class="min-w-0 truncate text-slate-100">{{ assigneeLabel }}</span>
+                }
               </button>
               @if (assigneeMenuOpen) {
                 <div
@@ -124,10 +151,7 @@
                       [class.bg-slate-800]="member.id === draftAssigneeId"
                       (click)="selectAssignee(member.id)"
                     >
-                      <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[10px] font-semibold text-white">
-                        {{ member.name.trim().charAt(0).toUpperCase() }}
-                      </span>
-                      <span class="truncate">{{ member.name }}</span>
+                      <app-user-mention [user]="member" />
                     </button>
                   } @empty {
                     <p class="px-3 py-2 text-slate-500">No board members</p>
@@ -136,7 +160,15 @@
               }
             </div>
 
-            <span class="text-slate-400">Due date</span>
+            <span class="flex items-center gap-2 text-slate-400">
+              <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+                <path d="M3 10h18"></path>
+                <path d="M8 3v4"></path>
+                <path d="M16 3v4"></path>
+              </svg>
+              Due date
+            </span>
             <div #deadlineRoot data-deadline-control class="relative min-w-0">
               @if (canToggleComplete) {
                 <button
@@ -209,23 +241,50 @@
               }
             </div>
 
-            <span class="text-slate-400">Projects</span>
+            <span class="flex items-center gap-2 text-slate-400">
+              <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path>
+              </svg>
+              Projects
+            </span>
             <span class="text-slate-300">{{ projectsLabel }}</span>
             
-            <span class="text-slate-400">Priority</span>
-            <select
-              class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white disabled:text-slate-300"
-              [ngModel]="draftPriority"
-              [disabled]="!canToggleComplete"
-              (ngModelChange)="onPriorityChange($event)"
-            >
-              <option [ngValue]="undefined">No priority</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </select>
+            <span class="flex items-center gap-2 text-slate-400">
+              <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M5 21V4"></path>
+                <path d="M5 4h11l-2 4 2 4H5"></path>
+              </svg>
+              Priority
+            </span>
+            @if (canToggleComplete) {
+              <div class="flex flex-wrap gap-2">
+                @for (item of priorityOptions; track item.value) {
+                  <button
+                    type="button"
+                    class="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                    [class]="priorityClass(item.value, draftPriority === item.value)"
+                    (click)="selectPriority(item.value)"
+                  >
+                    {{ item.label }}
+                  </button>
+                }
+              </div>
+            } @else if (draftPriority) {
+              <span class="w-fit rounded-full px-2.5 py-0.5 text-xs font-medium" [class]="priorityClass(draftPriority, true)">
+                {{ priorityLabel(draftPriority) }}
+              </span>
+            } @else {
+              <span class="text-slate-300">No priority</span>
+            }
 
-            <span class="self-start pt-2 text-slate-400">Description</span>
+            <span class="flex items-center gap-2 self-start pt-2 text-slate-400">
+              <svg class="size-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M4 6h16"></path>
+                <path d="M4 12h16"></path>
+                <path d="M4 18h10"></path>
+              </svg>
+              Description
+            </span>
             <textarea
               #descriptionInput
               class="min-h-24 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white read-only:text-slate-300"
@@ -239,7 +298,30 @@
 
           </div>
           <section class="mt-6">
-            <h3 class="mb-2 text-sm font-medium text-slate-300">Comments</h3>
+            <button
+              type="button"
+              class="mb-2 flex w-full items-center gap-2 text-left"
+              [attr.aria-expanded]="commentsOpen"
+              (click)="commentsOpen = !commentsOpen"
+            >
+              <svg
+                class="size-4 shrink-0 text-slate-400 transition"
+                [class.rotate-90]="commentsOpen"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path d="m9 6 6 6-6 6"></path>
+              </svg>
+              <svg class="size-4 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>
+              </svg>
+              <h3 class="text-sm font-medium text-slate-300">Comments</h3>
+              <span class="text-xs text-slate-500">{{ card.comments.length }}</span>
+            </button>
+            @if (commentsOpen) {
             @if (canCreateComment) {
               <div class="mb-3">
                 <textarea
@@ -268,19 +350,7 @@
             <ng-template #commentThread let-comment let-depth="depth">
               <div [class.mt-3]="depth > 0" [class.border-l]="depth > 0" [class.border-slate-800]="depth > 0" [class.pl-3]="depth > 0">
                 <div class="flex items-center gap-2">
-                  @if (commentAvatar(comment); as avatar) {
-                    <img
-                      class="size-8 shrink-0 rounded-full object-cover"
-                      [src]="avatar"
-                      [alt]="commentAuthorName(comment)"
-                      (error)="onAvatarError(comment._id)"
-                    />
-                  } @else {
-                    <span class="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-700 text-xs font-semibold text-white">
-                      {{ commentInitial(comment) }}
-                    </span>
-                  }
-                  <span class="truncate text-sm font-medium text-slate-100">{{ commentAuthorName(comment) }}</span>
+                  <app-user-mention class="min-w-0 text-slate-100" [user]="commentUser(comment)" size="md" />
                   @if (commentDate(comment)) {
                     <span class="shrink-0 text-xs text-slate-500">{{ commentDate(comment) }}</span>
                   }
@@ -358,15 +428,72 @@
                 }
               </div>
             </ng-template>
+            }
           </section>
           <section class="mt-6">
-            <h3 class="mb-2 text-sm font-medium text-slate-300">Activity</h3>
+            <button
+              type="button"
+              class="mb-2 flex w-full items-center gap-2 text-left"
+              [attr.aria-expanded]="activityOpen"
+              (click)="activityOpen = !activityOpen"
+            >
+              <svg
+                class="size-4 shrink-0 text-slate-400 transition"
+                [class.rotate-90]="activityOpen"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path d="m9 6 6 6-6 6"></path>
+              </svg>
+              <svg class="size-4 shrink-0 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 3-7.7"></path>
+                <path d="M3 3v5h5"></path>
+                <path d="M12 7v5l3 2"></path>
+              </svg>
+              <h3 class="text-sm font-medium text-slate-300">Activity</h3>
+              <span class="text-xs text-slate-500">{{ sortedActivity.length }}</span>
+            </button>
+            @if (activityOpen) {
             <div class="flex flex-col gap-3">
               @for (item of sortedActivity; track item._id) {
-                <div class="text-sm text-slate-300">
-                  <p>{{ activityText(item) }}</p>
-                  @if (item.type === 'description_changed') {
-                    <button type="button" class="mt-1 text-xs text-sky-400 hover:text-sky-300" (click)="$event.stopPropagation(); openDescriptionDiff(item)">
+                <div class="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-slate-300">
+                  @if (userMention(item.actorId); as actor) {
+                    <app-user-mention [user]="actor" />
+                  }
+                  @if (item.type === 'assignee_changed') {
+                    <span>changed assignee from</span>
+                    @if (userMention(item.assignee?.fromUserId); as fromUser) {
+                      <app-user-mention [user]="fromUser" />
+                    } @else {
+                      <span>Unassigned</span>
+                    }
+                    <span>to</span>
+                    @if (userMention(item.assignee?.toUserId); as toUser) {
+                      <app-user-mention [user]="toUser" />
+                    } @else {
+                      <span>Unassigned</span>
+                    }
+                  } @else if (item.type === 'deadline_changed') {
+                    <span>changed deadline from {{ deadlineActivityLabel(item.deadline?.from) }} to {{ deadlineActivityLabel(item.deadline?.to) }}</span>
+                  } @else if (item.type === 'priority_changed') {
+                    <span>changed priority from</span>
+                    @if (priorityValue(item.priority?.from); as fromPriority) {
+                      <span class="rounded-full px-2 py-0.5 text-[10px] font-medium" [class]="priorityClass(fromPriority, true)">
+                        {{ priorityLabel(fromPriority) }}
+                      </span>
+                    }
+                    <span>to</span>
+                    @if (priorityValue(item.priority?.to); as toPriority) {
+                      <span class="rounded-full px-2 py-0.5 text-[10px] font-medium" [class]="priorityClass(toPriority, true)">
+                        {{ priorityLabel(toPriority) }}
+                      </span>
+                    }
+                  } @else if (item.type === 'description_changed') {
+                    <span>changed description</span>
+                    <button type="button" class="basis-full text-left text-xs text-sky-400 hover:text-sky-300" (click)="$event.stopPropagation(); openDescriptionDiff(item)">
                       Переглянути diff
                     </button>
                   }
@@ -375,20 +502,8 @@
                 <p class="text-sm text-slate-500">No activity</p>
               }
             </div>
+            }
           </section>
-          <div class="mt-5">
-            <button
-              type="button"
-              class="rounded px-3 py-1.5 text-sm text-white transition disabled:cursor-not-allowed disabled:opacity-50"
-              [class]="card.taskComplete
-                ? 'bg-emerald-600 hover:bg-emerald-500'
-                : 'bg-slate-600 hover:bg-slate-500'"
-              [disabled]="!canToggleComplete || togglingComplete"
-              (click)="toggleComplete.emit(card)"
-            >
-              {{ card.taskComplete ? 'Completed' : 'Complete the task' }}
-            </button>
-          </div>
         </div>
         @if (diffItem) {
           <div class="fixed inset-0 z-[70] flex items-center justify-center bg-black/70 p-4" (click)="$event.stopPropagation(); diffItem = null">

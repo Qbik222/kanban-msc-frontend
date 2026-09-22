@@ -8,7 +8,9 @@
         <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 class="text-xl font-semibold text-white">{{ boardStore.activeBoard()!.title }}</h1>
-            <p class="mt-0.5 text-xs text-slate-500">team: {{ boardStore.activeBoard()!.teamId }}</p>
+            @if (teamName()) {
+              <p class="mt-0.5 text-xs text-slate-500">team: {{ teamName() }}</p>
+            }
           </div>
           <div class="flex items-center gap-2">
             <a
@@ -87,6 +89,7 @@
         [canUpdateAnyComments]="boardStore.permissions().has('comment:update:any')"
         [canCreateComment]="boardStore.permissions().has('comment:create')"
         [currentUserId]="boardStore.user()?.id ?? ''"
+        [currentUser]="boardStore.user()"
         [activity]="cardActivity"
         [togglingComplete]="togglingCardIds.has(activeModalCard()?.id ?? '')"
         (close)="closeCardModal()"

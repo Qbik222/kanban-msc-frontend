@@ -13,7 +13,7 @@ export interface CardComment {
   parentCommentId?: string | null;
 }
 
-export type CardActivityType = 'deadline_changed' | 'assignee_changed' | 'description_changed';
+export type CardActivityType = 'deadline_changed' | 'assignee_changed' | 'description_changed' | 'priority_changed';
 
 export interface CardActivityItem {
   _id: string;
@@ -23,6 +23,10 @@ export interface CardActivityItem {
   description?: {
     from?: string | null;
     to?: string | null;
+  };
+  priority?: {
+    from?: 'low' | 'medium' | 'high' | null;
+    to?: 'low' | 'medium' | 'high' | null;
   };
   assignee?: {
     fromUserId?: string | null;
@@ -94,6 +98,7 @@ export interface BoardMemberDto {
   id: string;
   email: string;
   name: string;
+  avatarUrl?: string;
   role: BoardMemberRole;
 }
 

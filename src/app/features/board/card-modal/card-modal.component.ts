@@ -1,12 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BoardMemberDto, Card, CardActivityItem, CardComment } from '../../../models/board.models';
+import { BoardMemberDto, Card, CardActivityItem, CardComment, UserProfile } from '../../../models/board.models';
+import { UserMentionComponent, UserMentionProfile } from '../../../shared/user-mention/user-mention.component';
 
 @Component({
   selector: 'app-card-modal',
   standalone: true,
-  imports: [FormsModule, NgTemplateOutlet],
+  imports: [FormsModule, NgTemplateOutlet, UserMentionComponent],
   templateUrl: './card-modal.component.html',
   styleUrl: './card-modal.component.scss',
 })
@@ -30,6 +31,7 @@ export class CardModalComponent implements OnDestroy {
   @Input() canUpdateAnyComments = false;
   @Input() canCreateComment = false;
   @Input() currentUserId = '';
+  @Input() currentUser: UserProfile | null = null;
   @Input() activity: CardActivityItem[] = [];
   @Input() togglingComplete = false;
   @Input() members: BoardMemberDto[] = [];
@@ -110,6 +112,8 @@ export class CardModalComponent implements OnDestroy {
   replyParentId: string | null = null;
   replyDraft = '';
   commentMenuId: string | null = null;
+  commentsOpen = true;
+  activityOpen = true;
   newComment = '';
   diffItem: CardActivityItem | null = null;
   diffFrom = '';
@@ -128,6 +132,11 @@ export class CardModalComponent implements OnDestroy {
   deadlineLeft = 0;
   deadlineError = '';
   readonly weekdayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+  readonly priorityOptions = [
+    { value: 'low' as const, label: 'Low' },
+    { value: 'medium' as const, label: 'Medium' },
+    { value: 'high' as const, label: 'High' },
+  ];
   calendarYear = new Date().getFullYear();
   calendarMonth = new Date().getMonth();
   private readonly refitDeadlineListener = () => this.refitDeadlinePanel();
@@ -278,6 +287,30 @@ export class CardModalComponent implements OnDestroy {
     return !this.isOwnComment(comment) && this.canCreateComment;
   }
 
+  userMention(userId: string | null | undefined): UserMentionProfile | null {
+    if (!userId) {
+      return null;
+    }
+    const member = this.members.find((item) => item.id === userId);
+    const author = this.card?.comments.find((comment) => comment.authorId === userId || comment.author?.id === userId)?.author;
+    const me = this.currentUser?.id === userId ? this.currentUser : null;
+    return {
+      id: userId,
+      name: member?.name || author?.name || me?.name || userId.slice(0, 8),
+      email: member?.email || me?.email,
+      role: member?.role,
+      avatarUrl: member?.avatarUrl || author?.avatarUrl || me?.avatarUrl,
+    };
+  }
+
+  commentUser(comment: CardComment): UserMentionProfile {
+    return this.userMention(comment.authorId) ?? {
+      id: comment.authorId,
+      name: this.commentAuthorName(comment),
+      avatarUrl: comment.author?.avatarUrl,
+    };
+  }
+
   commentAuthorName(comment: CardComment): string {
     return comment.author?.name || this.actorName(comment.authorId);
   }
@@ -392,7 +425,15 @@ export class CardModalComponent implements OnDestroy {
     if (item.type === 'deadline_changed') {
       return `${this.actorName(item.actorId)} changed deadline from ${this.deadlineActivityLabel(item.deadline?.from)} to ${this.deadlineActivityLabel(item.deadline?.to)}`;
     }
-    return `${this.actorName(item.actorId)} changed description`;
+    if (item.type === 'priority_changed') {
+      const from = this.priorityLabel(this.priorityValue(item.priority?.from) ?? 'medium');
+      const to = this.priorityLabel(this.priorityValue(item.priority?.to) ?? 'medium');
+      return `${this.actorName(item.actorId)} changed priority from ${from} to ${to}`;
+    }
+    if (item.type === 'description_changed') {
+      return `${this.actorName(item.actorId)} changed description`;
+    }
+    return `${this.actorName(item.actorId)} changed the card`;
   }
 
   openDescriptionDiff(item: CardActivityItem): void {
@@ -423,7 +464,7 @@ export class CardModalComponent implements OnDestroy {
     return this.members.find((member) => member.id === id)?.name || id.slice(0, 8);
   }
 
-  private deadlineActivityLabel(value: unknown): string {
+  deadlineActivityLabel(value: unknown): string {
     if (value == null || value === '') {
       return 'none';
     }
@@ -472,6 +513,31 @@ export class CardModalComponent implements OnDestroy {
     this.draftDescription = this.card?.description ?? '';
     this.lastSubmittedDescription = null;
     textarea.blur();
+  }
+
+  priorityValue(value: unknown): 'low' | 'medium' | 'high' | null {
+    if (value === 'low' || value === 'medium' || value === 'high') {
+      return value;
+    }
+    return null;
+  }
+
+  priorityLabel(priority: 'low' | 'medium' | 'high'): string {
+    return this.priorityOptions.find((item) => item.value === priority)?.label ?? priority;
+  }
+
+  priorityClass(priority: 'low' | 'medium' | 'high', selected: boolean): string {
+    if (priority === 'high') {
+      return selected ? 'bg-red-600 text-white' : 'bg-red-600/20 text-red-200';
+    }
+    if (priority === 'medium') {
+      return selected ? 'bg-amber-500 text-slate-950' : 'bg-amber-500/20 text-amber-200';
+    }
+    return selected ? 'bg-emerald-600 text-white' : 'bg-emerald-600/20 text-emerald-200';
+  }
+
+  selectPriority(value: 'low' | 'medium' | 'high'): void {
+    this.onPriorityChange(this.draftPriority === value ? null : value);
   }
 
   onPriorityChange(value: 'low' | 'medium' | 'high' | null | undefined): void {

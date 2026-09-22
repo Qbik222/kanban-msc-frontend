@@ -73,20 +73,17 @@
                   title="Change assignee"
                   (click)="toggleAssigneeMenu(assigneeAnchor)"
                 >
-                  <span
-                    class="flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
-                    [class]="skeletonAssignee ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'"
-                  >
-                    @if (skeletonAssigneeInitial) {
-                      {{ skeletonAssigneeInitial }}
-                    } @else {
+                  @if (skeletonAssignee) {
+                    <app-user-mention class="min-w-0 text-slate-200" [user]="skeletonAssignee" />
+                  } @else {
+                    <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-700 text-slate-300">
                       <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <circle cx="12" cy="8" r="3"></circle>
                         <path d="M5 19a7 7 0 0 1 14 0"></path>
                       </svg>
-                    }
-                  </span>
-                  <span class="truncate text-xs text-slate-200">{{ skeletonAssigneeLabel }}</span>
+                    </span>
+                    <span class="truncate text-xs text-slate-200">{{ skeletonAssigneeLabel }}</span>
+                  }
                 </button>
                 @if (assigneeMenuOpen) {
                   <div
@@ -103,10 +100,7 @@
                         [class.bg-slate-800]="member.id === skeletonAssigneeId"
                         (click)="selectAssignee(member.id)"
                       >
-                        <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[10px] font-semibold text-white">
-                          {{ member.name.trim().charAt(0).toUpperCase() }}
-                        </span>
-                        <span class="truncate">{{ member.name }}</span>
+                        <app-user-mention [user]="member" />
                       </button>
                     } @empty {
                       <p class="px-3 py-2 text-xs text-slate-500">No board members</p>

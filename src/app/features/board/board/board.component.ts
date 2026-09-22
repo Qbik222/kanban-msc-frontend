@@ -37,6 +37,7 @@ export class BoardComponent implements OnDestroy {
   @ViewChild(CardModalComponent) private cardModal?: CardModalComponent;
 
   readonly boardStore = inject(BoardStore);
+  readonly teamStore = inject(TeamStore);
   readonly archive = inject(CardArchiveService);
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(BoardApiService);
@@ -76,7 +77,10 @@ export class BoardComponent implements OnDestroy {
           this.socket.joinBoard(id);
           void this.loadBoardMembers(id);
           return from(this.boardStore.loadBoard(id)).pipe(
-            tap(() => this.pruneArchive()),
+            tap(() => {
+              this.pruneArchive();
+              this.ensureTeamName();
+            }),
           );
         }),
       )
@@ -91,6 +95,22 @@ export class BoardComponent implements OnDestroy {
       }
       void this.loadCardActivity(this.selectedCardId);
     });
+  }
+
+  teamName(): string {
+    const teamId = this.boardStore.activeBoard()?.teamId;
+    if (!teamId) {
+      return '';
+    }
+    return this.teamStore.teamNameById().get(teamId) ?? '';
+  }
+
+  private ensureTeamName(): void {
+    const teamId = this.boardStore.activeBoard()?.teamId;
+    if (!teamId || this.teamStore.teamNameById().has(teamId) || this.teamStore.loading()) {
+      return;
+    }
+    void this.teamStore.loadTeams();
   }
 
   ngOnDestroy(): void {
@@ -527,6 +547,7 @@ export class BoardComponent implements OnDestroy {
         return;
       }
       this.boardStore.upsertCard(updated);
+      void this.loadCardActivity(cardId);
     } catch (e) {
       if (this.priorityRequestIds.get(cardId) !== requestId) {
         return;

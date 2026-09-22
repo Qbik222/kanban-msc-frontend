@@ -1,10 +1,11 @@
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, OnDestroy, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { BoardMemberDto, Card } from '../../../models/board.models';
+import { UserMentionComponent } from '../../../shared/user-mention/user-mention.component';
 
 @Component({
   selector: 'app-card',
   standalone: true,
-  imports: [],
+  imports: [UserMentionComponent],
   templateUrl: './card.component.html',
   styleUrl: './card.component.scss',
 })
@@ -31,6 +32,26 @@ export class CardComponent implements OnChanges, OnDestroy {
   @Output() deadlineChange = new EventEmitter<{ startDate: string; endDate: string } | null>();
 
   readonly weekdayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
+
+  priorityLabel(priority: 'low' | 'medium' | 'high'): string {
+    if (priority === 'high') {
+      return 'High';
+    }
+    if (priority === 'medium') {
+      return 'Medium';
+    }
+    return 'Low';
+  }
+
+  priorityClass(priority: 'low' | 'medium' | 'high'): string {
+    if (priority === 'high') {
+      return 'bg-red-600 text-white';
+    }
+    if (priority === 'medium') {
+      return 'bg-amber-500 text-slate-950';
+    }
+    return 'bg-emerald-600 text-white';
+  }
   assigneeMenuOpen = false;
   actionsMenuOpen = false;
   actionsTop = 0;

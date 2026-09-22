@@ -46,20 +46,17 @@
             [title]="!canToggleComplete ? 'No permission to update cards' : 'Change assignee'"
             (click)="toggleAssigneeMenu(assigneeAnchor)"
           >
-            <span
-              class="flex size-6 shrink-0 items-center justify-center rounded-full text-[10px] font-semibold"
-              [class]="selectedMember ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'"
-            >
-              @if (assigneeInitial) {
-                {{ assigneeInitial }}
-              } @else {
+            @if (selectedMember) {
+              <app-user-mention class="min-w-0 text-slate-200" [user]="selectedMember" />
+            } @else {
+              <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-700 text-slate-300">
                 <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                   <circle cx="12" cy="8" r="3"></circle>
                   <path d="M5 19a7 7 0 0 1 14 0"></path>
                 </svg>
-              }
-            </span>
-            <span class="truncate text-xs text-slate-200">{{ assigneeLabel }}</span>
+              </span>
+              <span class="truncate text-xs text-slate-200">{{ assigneeLabel }}</span>
+            }
           </button>
           @if (assigneeMenuOpen) {
             <div
@@ -89,10 +86,7 @@
                   [class.bg-slate-800]="member.id === card.assigneeId"
                   (click)="selectAssignee(member.id)"
                 >
-                  <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[10px] font-semibold text-white">
-                    {{ member.name.trim().charAt(0).toUpperCase() }}
-                  </span>
-                  <span class="truncate">{{ member.name }}</span>
+                  <app-user-mention [user]="member" />
                 </button>
               } @empty {
                 <p class="px-3 py-2 text-xs text-slate-500">No board members</p>
@@ -105,16 +99,19 @@
         }
         <div class="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-slate-500">
           @if (card.priority) {
-            <span
-              class="rounded px-1.5 py-0.5 uppercase tracking-wide"
-              [class.bg-amber-900]="card.priority === 'high'"
-              [class.bg-slate-800]="card.priority !== 'high'"
-              >{{ card.priority }}</span>
+            <span class="rounded-full px-2 py-0.5 font-medium" [class]="priorityClass(card.priority)">
+              {{ priorityLabel(card.priority) }}
+            </span>
           }
           @if (card.projectIds.length) {
             <span>{{ card.projectIds.length }} projects</span>
           }
-          <span>{{ card.comments.length }} comments</span>
+          <span class="inline-flex items-center gap-1" [attr.aria-label]="card.comments.length + ' comments'">
+            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"></path>
+            </svg>
+            {{ card.comments.length }}
+          </span>
         </div>
         <div
           #deadlineRoot
@@ -243,19 +240,18 @@
       }
       <button
         type="button"
-        class="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-white transition disabled:cursor-not-allowed disabled:opacity-50"
+        class="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full border-2 transition disabled:cursor-not-allowed disabled:opacity-50"
         [class]="card.taskComplete
-          ? 'bg-emerald-500 hover:bg-emerald-400'
-          : 'border border-white bg-transparent hover:bg-white/10'"
+          ? 'border-emerald-300 bg-emerald-500 text-white shadow-sm hover:bg-emerald-400'
+          : 'border-white/80 bg-transparent text-white/80 hover:border-white hover:bg-white/10 hover:text-white'"
         [disabled]="!canToggleComplete || togglingComplete"
         [attr.aria-label]="card.taskComplete ? 'Mark task as incomplete' : 'Mark task as complete'"
         [title]="!canToggleComplete ? 'No permission to update cards' : (card.taskComplete ? 'Mark as incomplete' : 'Mark as complete')"
         (pointerdown)="$event.stopPropagation()"
         (click)="$event.stopPropagation(); toggleComplete.emit()"
       >
-        <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-          <circle cx="12" cy="12" r="9"></circle>
-          <path d="m8 12 2.5 2.5L16 9"></path>
+        <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12.5 9.5 17 19 7"></path>
         </svg>
       </button>
     </article>

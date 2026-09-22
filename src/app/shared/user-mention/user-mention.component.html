@@ -1,0 +1,63 @@
+<span
+  #anchor
+  class="inline-flex min-w-0 max-w-full items-center gap-1.5 align-middle"
+  (mouseenter)="show()"
+  (mouseleave)="scheduleHide()"
+>
+  @if (avatarUrl) {
+    <img
+      class="shrink-0 rounded-full object-cover"
+      [class.size-6]="size === 'sm'"
+      [class.size-8]="size === 'md'"
+      [src]="avatarUrl"
+      [alt]="user.name"
+      (error)="onAvatarError()"
+    />
+  } @else {
+    <span
+      class="flex shrink-0 items-center justify-center rounded-full bg-sky-600 font-semibold text-white"
+      [class.size-6]="size === 'sm'"
+      [class.size-8]="size === 'md'"
+      [class.text-[10px]]="size === 'sm'"
+      [class.text-xs]="size === 'md'"
+    >
+      {{ initial }}
+    </span>
+  }
+  <span class="min-w-0 truncate" [class.text-xs]="size === 'sm'" [class.text-sm]="size === 'md'" [class.font-medium]="size === 'md'">
+    {{ user.name }}
+  </span>
+</span>
+@if (open) {
+  <span
+    #panel
+    class="fixed z-[80] w-56 rounded-md border border-slate-700 bg-slate-950 p-3 text-left shadow-xl"
+    [style.top.px]="top"
+    [style.left.px]="left"
+    (mouseenter)="show()"
+    (mouseleave)="scheduleHide()"
+    (click)="$event.stopPropagation()"
+    (pointerdown)="$event.stopPropagation()"
+  >
+    <span class="flex items-center gap-3">
+      @if (avatarUrl) {
+        <img class="size-10 shrink-0 rounded-full object-cover" [src]="avatarUrl" [alt]="user.name" />
+      } @else {
+        <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-sky-600 text-sm font-semibold text-white">
+          {{ initial }}
+        </span>
+      }
+      <span class="min-w-0">
+        <span class="block truncate text-sm font-medium text-slate-100">{{ user.name }}</span>
+        @if (user.email) {
+          <span class="block truncate text-xs text-slate-400">{{ user.email }}</span>
+        }
+        @if (user.role) {
+          <span class="mt-1 inline-block rounded-full bg-slate-800 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-300">
+            {{ user.role }}
+          </span>
+        }
+      </span>
+    </span>
+  </span>
+}
