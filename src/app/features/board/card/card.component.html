@@ -1,13 +1,15 @@
 
     <article
-      class="relative rounded-md border bg-slate-950/80 p-3 shadow-sm transition"
+      class="relative min-w-0 overflow-hidden rounded-md border bg-slate-950/80 p-3 shadow-sm transition"
       [class]="card.taskComplete
         ? 'border-emerald-500 hover:border-emerald-400'
-        : 'border-slate-700 hover:border-slate-500'"
+        : deadlineOverdue
+          ? 'border-red-500 hover:border-red-400'
+          : 'border-slate-700 hover:border-slate-500'"
       (click)="onCardClick($event)"
     >
       <div
-        class="pr-8 transition"
+        class="pr-10 transition"
         [class.opacity-50]="card.taskComplete"
         [class.brightness-75]="card.taskComplete"
       >
@@ -15,7 +17,7 @@
           <input
             #titleInput
             data-title-control
-            class="w-full rounded border border-transparent bg-transparent px-1 py-0.5 font-medium text-slate-100 outline-none transition hover:border-slate-600 hover:bg-slate-900 focus:border-slate-500 focus:bg-slate-900"
+            class="block w-full min-w-0 max-w-full rounded border border-transparent bg-transparent px-1 py-0.5 font-medium text-slate-100 outline-none transition hover:border-slate-600 hover:bg-slate-900 focus:border-slate-500 focus:bg-slate-900"
             [value]="draftTitle"
             (input)="draftTitle = $any($event.target).value"
             (focus)="titleFocused = true"
@@ -37,7 +39,7 @@
           <button
             #assigneeAnchor
             type="button"
-            class="flex max-w-full items-center gap-2 rounded-md text-left disabled:cursor-not-allowed"
+            class="flex min-w-0 max-w-full items-center gap-2 rounded-md text-left disabled:cursor-not-allowed"
             [disabled]="!canToggleComplete"
             [title]="!canToggleComplete ? 'No permission to update cards' : 'Change assignee'"
             (click)="toggleAssigneeMenu(assigneeAnchor)"
@@ -59,7 +61,8 @@
           </button>
           @if (assigneeMenuOpen) {
             <div
-              class="fixed z-50 max-h-52 w-56 overflow-y-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-xl"
+              #assigneePanel
+              class="fixed z-50 max-h-[calc(100dvh-1rem)] w-56 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-xl"
               [style.top.px]="menuTop"
               [style.left.px]="menuLeft"
             >
@@ -95,14 +98,82 @@
           @if (card.projectIds.length) {
             <span>{{ card.projectIds.length }} projects</span>
           }
-          @if (card.deadline?.startDate && card.deadline?.endDate) {
-            <span>{{ card.deadline?.startDate | date: 'MMM d' }} - {{ card.deadline?.endDate | date: 'MMM d' }}</span>
-          } @else if (card.deadline?.startDate) {
-            <span>Start {{ card.deadline?.startDate | date: 'MMM d' }}</span>
-          } @else if (card.deadline?.endDate) {
-            <span>Due {{ card.deadline?.endDate | date: 'MMM d' }}</span>
-          }
           <span>{{ card.comments.length }} comments</span>
+        </div>
+        <div
+          #deadlineRoot
+          data-deadline-control
+          class="mt-2"
+          (pointerdown)="$event.stopPropagation()"
+        >
+          @if (canToggleComplete) {
+            <button
+              #deadlineAnchor
+              type="button"
+              class="max-w-full truncate rounded-md text-left text-xs"
+              [class]="deadlineOverdue ? 'text-red-400 hover:text-red-300' : 'text-slate-300 hover:text-white'"
+              (click)="toggleDeadline(deadlineAnchor)"
+            >
+              {{ deadlineLabel }}
+            </button>
+            @if (deadlineOpen) {
+              <div
+                #deadlinePanel
+                class="fixed z-50 max-h-[calc(100dvh-1rem)] w-64 max-w-[calc(100vw-1rem)] overflow-y-auto rounded-md border border-slate-700 bg-slate-950 p-3 text-slate-100 shadow-xl"
+                [style.top.px]="deadlineTop"
+                [style.left.px]="deadlineLeft"
+              >
+                <div class="mb-2 flex items-center justify-between text-sm">
+                  <button type="button" class="rounded px-2 py-1 hover:bg-slate-800" (click)="shiftMonth(-1)" aria-label="Previous month">‹</button>
+                  <span class="min-w-0 truncate">{{ calendarTitle }}</span>
+                  <button type="button" class="rounded px-2 py-1 hover:bg-slate-800" (click)="shiftMonth(1)" aria-label="Next month">›</button>
+                </div>
+                <div class="grid grid-cols-7 gap-1 text-center text-[10px] text-slate-500">
+                  @for (label of weekdayLabels; track label) {
+                    <span>{{ label }}</span>
+                  }
+                </div>
+                <div class="mt-1 grid grid-cols-7 gap-1">
+                  @for (day of calendarDays; track day.date) {
+                    <button
+                      type="button"
+                      class="rounded py-1 text-xs"
+                      [class]="dayClass(day.date, day.inMonth)"
+                      (click)="selectCalendarDay(day.date)"
+                    >
+                      {{ day.dayNumber }}
+                    </button>
+                  }
+                </div>
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                  <input
+                    class="min-w-0 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
+                    placeholder="YYYY-MM-DD"
+                    aria-label="Start date"
+                    [value]="draftStart"
+                    (input)="onDeadlineInput('start', $event)"
+                    (blur)="commitDeadline()"
+                  />
+                  <input
+                    class="min-w-0 w-full rounded border border-slate-700 bg-slate-900 px-2 py-1 text-xs text-white"
+                    placeholder="YYYY-MM-DD"
+                    aria-label="End date"
+                    [value]="draftEnd"
+                    (input)="onDeadlineInput('end', $event)"
+                    (blur)="commitDeadline()"
+                  />
+                </div>
+                @if (deadlineError) {
+                  <p class="mt-2 text-xs text-red-400">{{ deadlineError }}</p>
+                }
+                <button type="button" class="mt-2 text-xs text-slate-400 hover:text-white" (click)="clearDeadline()">
+                  Clear deadline
+                </button>
+              </div>
+            }
+          } @else {
+            <span class="text-xs" [class]="deadlineOverdue ? 'text-red-400' : 'text-slate-500'">{{ deadlineLabel }}</span>
+          }
         </div>
       </div>
       <button

@@ -51,6 +51,7 @@
               [showSkeleton]="skeletonColumnId === col.id && !!skeletonCardId"
               [skeletonCardId]="skeletonCardId"
               [skeletonTitle]="skeletonTitle"
+              [skeletonAssigneeId]="skeletonAssigneeId"
               [skeletonStartDate]="skeletonStartDate"
               [skeletonEndDate]="skeletonEndDate"
               (addCard)="onAddCard(col.id)"
@@ -58,7 +59,9 @@
               (toggleCardComplete)="toggleCardComplete($event)"
               (assigneeChange)="assignCard($event.card.id, $event.userId)"
               (titleChange)="renameCard($event.card.id, $event.title)"
+              (deadlineChange)="updateCardDeadline($event.card.id, $event.deadline)"
               (skeletonTitleChange)="skeletonTitle = $event"
+              (skeletonAssigneeChange)="skeletonAssigneeId = $event"
               (skeletonStartDateChange)="skeletonStartDate = $event"
               (skeletonEndDateChange)="skeletonEndDate = $event"
               (saveSkeleton)="saveSkeleton()"
@@ -75,9 +78,12 @@
         [canToggleComplete]="boardStore.permissions().has('card:update')"
         [togglingComplete]="togglingCardIds.has(activeModalCard()?.id ?? '')"
         (close)="closeCardModal()"
-        (save)="saveCardModal($event)"
         (toggleComplete)="toggleCardComplete($event)"
         (assigneeChange)="assignCard(activeModalCard()?.id ?? '', $event)"
+        (titleChange)="renameCard(activeModalCard()?.id ?? '', $event)"
+        (descriptionChange)="updateCardDescription(activeModalCard()?.id ?? '', $event)"
+        (priorityChange)="updateCardPriority(activeModalCard()?.id ?? '', $event)"
+        (deadlineChange)="updateCardDeadline(activeModalCard()?.id ?? '', $event)"
       />
     </div>
   

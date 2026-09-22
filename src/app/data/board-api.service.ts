@@ -83,10 +83,10 @@ export class BoardApiService {
       Partial<{
         title: string;
         description: string;
-        priority: 'low' | 'medium' | 'high';
+        priority: 'low' | 'medium' | 'high' | null;
         assigneeId: string;
         projectIds: string[];
-        deadline: CardDeadline;
+        deadline: CardDeadline | null;
         taskComplete: boolean;
       }>,
   ): Observable<Card> {

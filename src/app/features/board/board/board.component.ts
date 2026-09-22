@@ -13,7 +13,7 @@ import { TeamMember } from '../../../models/team.models';
 import { ColumnComponent } from '../column/column.component';
 import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
 import { FormsModule } from '@angular/forms';
-import { CardModalComponent, CardModalSavePayload } from '../card-modal/card-modal.component';
+import { CardModalComponent } from '../card-modal/card-modal.component';
 import { CanViewDirective } from '../../../shared/directives/can-view.directive';
 import { ToastService } from '../../../core/toast/toast.service';
 
@@ -46,6 +46,7 @@ export class BoardComponent implements OnDestroy {
   skeletonCardId: string | null = null;
   skeletonColumnId: string | null = null;
   skeletonTitle = '';
+  skeletonAssigneeId = '';
   skeletonStartDate = '';
   skeletonEndDate = '';
   selectedCardId: string | null = null;
@@ -53,6 +54,9 @@ export class BoardComponent implements OnDestroy {
   boardMembers: BoardMemberDto[] = [];
   private assigneeRequestId = 0;
   private titleRequestIds = new Map<string, number>();
+  private descriptionRequestIds = new Map<string, number>();
+  private priorityRequestIds = new Map<string, number>();
+  private deadlineRequestIds = new Map<string, number>();
 
   constructor() {
     this.route.paramMap
@@ -131,8 +135,9 @@ export class BoardComponent implements OnDestroy {
       this.skeletonColumnId = columnId;
       const card = this.findCard(created.id);
       this.skeletonTitle = card?.title ?? 'New task';
-      this.skeletonStartDate = this.toDateInputValue(card?.deadline?.startDate);
-      this.skeletonEndDate = this.toDateInputValue(card?.deadline?.endDate);
+      this.skeletonAssigneeId = card?.assigneeId ?? '';
+      this.skeletonStartDate = calendarDay(card?.deadline?.startDate);
+      this.skeletonEndDate = calendarDay(card?.deadline?.endDate);
     } catch (e) {
       this.boardStore.setActiveBoard(previous);
       this.boardStore.setError(e instanceof Error ? e.message : 'Failed to create card');
@@ -145,17 +150,24 @@ export class BoardComponent implements OnDestroy {
     if (!this.skeletonCardId || !this.skeletonTitle.trim()) {
       return;
     }
+    const start = this.skeletonStartDate.trim();
+    const end = this.skeletonEndDate.trim();
+    if (start || end) {
+      if (!isCalendarDay(start) || !isCalendarDay(end)) {
+        this.boardStore.setError('Choose both start and end dates');
+        return;
+      }
+      if (end < start) {
+        this.boardStore.setError('endDate cannot be earlier than startDate');
+        return;
+      }
+    }
     try {
       const updated = await firstValueFrom(
         this.api.patchCard(this.skeletonCardId, {
           title: this.skeletonTitle.trim(),
-          deadline:
-            this.skeletonStartDate || this.skeletonEndDate
-              ? {
-                  startDate: this.skeletonStartDate || undefined,
-                  endDate: this.skeletonEndDate || undefined,
-                }
-              : undefined,
+          ...(this.skeletonAssigneeId ? { assigneeId: this.skeletonAssigneeId } : {}),
+          ...(start && end ? { deadline: { startDate: start, endDate: end } } : {}),
         }),
       );
       this.boardStore.upsertCard(updated);
@@ -298,24 +310,113 @@ export class BoardComponent implements OnDestroy {
     }
   }
 
-  async saveCardModal(payload: CardModalSavePayload): Promise<void> {
-    const card = this.activeModalCard();
+  async updateCardDeadline(
+    cardId: string,
+    deadline: { startDate: string; endDate: string } | null,
+  ): Promise<void> {
+    const card = this.findCard(cardId);
     if (!card) {
       return;
     }
+    if (deadline && deadline.endDate < deadline.startDate) {
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError('endDate cannot be earlier than startDate');
+      return;
+    }
+    const currentStart = calendarDay(card.deadline?.startDate);
+    const currentEnd = calendarDay(card.deadline?.endDate);
+    const unchanged = deadline
+      ? deadline.startDate === currentStart && deadline.endDate === currentEnd
+      : !currentStart && !currentEnd;
+    if (unchanged) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:update')) {
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError('No permission to update cards');
+      return;
+    }
+
+    const requestId = (this.deadlineRequestIds.get(cardId) ?? 0) + 1;
+    this.deadlineRequestIds.set(cardId, requestId);
+    this.boardStore.setError(null);
     try {
       const updated = await firstValueFrom(
-        this.api.patchCard(card.id, {
-          title: payload.title,
-          description: payload.description,
-          priority: payload.priority,
-          deadline: payload.deadline,
+        this.api.patchCard(cardId, {
+          deadline: deadline ? { startDate: deadline.startDate, endDate: deadline.endDate } : null,
         }),
       );
+      if (this.deadlineRequestIds.get(cardId) !== requestId) {
+        return;
+      }
       this.boardStore.upsertCard(updated);
-      this.closeCardModal();
     } catch (e) {
-      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update card');
+      if (this.deadlineRequestIds.get(cardId) !== requestId) {
+        return;
+      }
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update deadline');
+    }
+  }
+
+  async updateCardDescription(cardId: string, description: string): Promise<void> {
+    const card = this.findCard(cardId);
+    if (!card || card.description === description) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:update')) {
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError('No permission to update cards');
+      return;
+    }
+
+    const requestId = (this.descriptionRequestIds.get(cardId) ?? 0) + 1;
+    this.descriptionRequestIds.set(cardId, requestId);
+    this.boardStore.setError(null);
+    try {
+      const updated = await firstValueFrom(this.api.patchCard(cardId, { description }));
+      if (this.descriptionRequestIds.get(cardId) !== requestId) {
+        return;
+      }
+      this.boardStore.upsertCard(updated);
+    } catch (e) {
+      if (this.descriptionRequestIds.get(cardId) !== requestId) {
+        return;
+      }
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update description');
+    }
+  }
+
+  async updateCardPriority(
+    cardId: string,
+    priority: 'low' | 'medium' | 'high' | null,
+  ): Promise<void> {
+    const card = this.findCard(cardId);
+    if (!card || (card.priority ?? null) === priority) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:update')) {
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError('No permission to update cards');
+      return;
+    }
+
+    const requestId = (this.priorityRequestIds.get(cardId) ?? 0) + 1;
+    this.priorityRequestIds.set(cardId, requestId);
+    this.boardStore.setError(null);
+    try {
+      const updated = await firstValueFrom(this.api.patchCard(cardId, { priority }));
+      if (this.priorityRequestIds.get(cardId) !== requestId) {
+        return;
+      }
+      this.boardStore.upsertCard(updated);
+    } catch (e) {
+      if (this.priorityRequestIds.get(cardId) !== requestId) {
+        return;
+      }
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update priority');
     }
   }
 
@@ -343,6 +444,7 @@ export class BoardComponent implements OnDestroy {
     this.skeletonCardId = null;
     this.skeletonColumnId = null;
     this.skeletonTitle = '';
+    this.skeletonAssigneeId = '';
     this.skeletonStartDate = '';
     this.skeletonEndDate = '';
   }
@@ -357,14 +459,25 @@ export class BoardComponent implements OnDestroy {
     return null;
   }
 
-  private toDateInputValue(raw: string | Date | undefined): string {
-    if (!raw) {
-      return '';
-    }
-    const date = new Date(raw);
-    if (Number.isNaN(date.getTime())) {
-      return '';
-    }
-    return date.toISOString().slice(0, 10);
+}
+
+function calendarDay(raw: string | Date | undefined): string {
+  if (!raw) {
+    return '';
   }
+  if (typeof raw === 'string') {
+    return raw.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? '';
+  }
+  const month = `${raw.getMonth() + 1}`.padStart(2, '0');
+  const day = `${raw.getDate()}`.padStart(2, '0');
+  return `${raw.getFullYear()}-${month}-${day}`;
+}
+
+function isCalendarDay(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
