@@ -45,6 +45,7 @@
               [canCreateCard]="boardStore.canCreateCard()"
               [canMoveCards]="boardStore.canMoveCards()"
               [canUpdateCards]="boardStore.permissions().has('card:update')"
+              [members]="boardMembers"
               [creatingCard]="creatingCardColumnId === col.id"
               [togglingCardIds]="togglingCardIds"
               [showSkeleton]="skeletonColumnId === col.id && !!skeletonCardId"
@@ -55,6 +56,7 @@
               (addCard)="onAddCard(col.id)"
               (openCard)="openCard($event)"
               (toggleCardComplete)="toggleCardComplete($event)"
+              (assigneeChange)="assignCard($event.card.id, $event.userId)"
               (skeletonTitleChange)="skeletonTitle = $event"
               (skeletonStartDateChange)="skeletonStartDate = $event"
               (skeletonEndDateChange)="skeletonEndDate = $event"
@@ -68,11 +70,13 @@
       <app-ai-assistant />
       <app-card-modal
         [card]="activeModalCard()"
+        [members]="boardMembers"
         [canToggleComplete]="boardStore.permissions().has('card:update')"
         [togglingComplete]="togglingCardIds.has(activeModalCard()?.id ?? '')"
         (close)="closeCardModal()"
         (save)="saveCardModal($event)"
         (toggleComplete)="toggleCardComplete($event)"
+        (assigneeChange)="assignCard(activeModalCard()?.id ?? '', $event)"
       />
     </div>
   

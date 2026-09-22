@@ -1,4 +1,4 @@
-import { Component, OnDestroy, inject } from '@angular/core';
+import { Component, OnDestroy, ViewChild, inject } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { filter, map, switchMap, tap } from 'rxjs/operators';
@@ -8,7 +8,7 @@ import { BoardApiService } from '../../../data/board-api.service';
 import { BoardStore } from '../../../state/board.store';
 import { TeamStore } from '../../../state/team.store';
 import { SocketService } from '../../../realtime/socket.service';
-import { Card } from '../../../models/board.models';
+import { BoardMemberDto, Card } from '../../../models/board.models';
 import { TeamMember } from '../../../models/team.models';
 import { ColumnComponent } from '../column/column.component';
 import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
@@ -33,6 +33,8 @@ import { ToastService } from '../../../core/toast/toast.service';
   styleUrl: './board.component.scss',
 })
 export class BoardComponent implements OnDestroy {
+  @ViewChild(CardModalComponent) private cardModal?: CardModalComponent;
+
   readonly boardStore = inject(BoardStore);
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(BoardApiService);
@@ -48,6 +50,8 @@ export class BoardComponent implements OnDestroy {
   skeletonEndDate = '';
   selectedCardId: string | null = null;
   togglingCardIds: ReadonlySet<string> = new Set();
+  boardMembers: BoardMemberDto[] = [];
+  private assigneeRequestId = 0;
 
   constructor() {
     this.route.paramMap
@@ -56,8 +60,10 @@ export class BoardComponent implements OnDestroy {
         map((p) => p.get('boardId')),
         filter((id): id is string => !!id),
         switchMap((id) => {
+          this.boardMembers = [];
           this.socket.ensureConnected();
           this.socket.joinBoard(id);
+          void this.loadBoardMembers(id);
           return from(this.boardStore.loadBoard(id)).pipe(
             tap(() => {}),
           );
@@ -67,6 +73,7 @@ export class BoardComponent implements OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.boardMembers = [];
     this.boardStore.setActiveBoard(null);
     this.socket.resetActiveBoard();
   }
@@ -228,6 +235,38 @@ export class BoardComponent implements OnDestroy {
     this.selectedCardId = null;
   }
 
+  async assignCard(cardId: string, userId: string): Promise<void> {
+    const card = this.findCard(cardId);
+    if (!card || !userId || card.assigneeId === userId) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:update')) {
+      if (this.selectedCardId === card.id) {
+        this.cardModal?.revertAssignee();
+      }
+      this.boardStore.setError('No permission to update cards');
+      return;
+    }
+
+    const requestId = ++this.assigneeRequestId;
+    this.boardStore.setError(null);
+    try {
+      const updated = await firstValueFrom(this.api.patchCard(card.id, { assigneeId: userId }));
+      if (requestId !== this.assigneeRequestId) {
+        return;
+      }
+      this.boardStore.upsertCard(updated);
+    } catch (e) {
+      if (requestId !== this.assigneeRequestId) {
+        return;
+      }
+      if (this.selectedCardId === card.id) {
+        this.cardModal?.revertAssignee();
+      }
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update assignee');
+    }
+  }
+
   async saveCardModal(payload: CardModalSavePayload): Promise<void> {
     const card = this.activeModalCard();
     if (!card) {
@@ -254,6 +293,19 @@ export class BoardComponent implements OnDestroy {
       return null;
     }
     return this.findCard(this.selectedCardId);
+  }
+
+  private async loadBoardMembers(boardId: string): Promise<void> {
+    try {
+      const members = await firstValueFrom(this.api.listBoardMembers(boardId));
+      if (this.route.snapshot.paramMap.get('boardId') === boardId) {
+        this.boardMembers = members.filter((member) => !!member.id);
+      }
+    } catch {
+      if (this.route.snapshot.paramMap.get('boardId') === boardId) {
+        this.boardMembers = [];
+      }
+    }
   }
 
   private clearSkeleton(): void {

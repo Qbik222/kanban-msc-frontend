@@ -1,7 +1,7 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { FormsModule } from '@angular/forms';
-import { Column, Card } from '../../../models/board.models';
+import { BoardMemberDto, Column, Card } from '../../../models/board.models';
 import { CardComponent } from '../card/card.component';
 
 @Component({
@@ -16,6 +16,7 @@ export class ColumnComponent {
   @Input() canCreateCard = false;
   @Input() canMoveCards = false;
   @Input() canUpdateCards = false;
+  @Input() members: BoardMemberDto[] = [];
   @Input() creatingCard = false;
   @Input() togglingCardIds: ReadonlySet<string> = new Set();
   @Input() showSkeleton = false;
@@ -28,6 +29,7 @@ export class ColumnComponent {
   @Output() addCard = new EventEmitter<void>();
   @Output() openCard = new EventEmitter<Card>();
   @Output() toggleCardComplete = new EventEmitter<Card>();
+  @Output() assigneeChange = new EventEmitter<{ card: Card; userId: string }>();
   @Output() skeletonTitleChange = new EventEmitter<string>();
   @Output() skeletonStartDateChange = new EventEmitter<string>();
   @Output() skeletonEndDateChange = new EventEmitter<string>();

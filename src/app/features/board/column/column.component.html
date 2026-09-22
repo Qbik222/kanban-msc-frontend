@@ -78,10 +78,12 @@
             >
               <app-card
                 [card]="c"
+                [members]="members"
                 [canToggleComplete]="canUpdateCards"
                 [togglingComplete]="togglingCardIds.has(c.id)"
                 (clicked)="openCard.emit(c)"
                 (toggleComplete)="toggleCardComplete.emit(c)"
+                (assigneeChange)="assigneeChange.emit({ card: c, userId: $event })"
               />
             </div>
           }

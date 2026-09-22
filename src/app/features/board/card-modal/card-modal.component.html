@@ -4,57 +4,103 @@
         <div
           class="w-full max-w-2xl rounded-xl border bg-slate-900 p-5 shadow-2xl transition"
           [class]="card.taskComplete ? 'border-emerald-500' : 'border-slate-700'"
-          (click)="$event.stopPropagation()"
+          (click)="$event.stopPropagation(); assigneeMenuOpen = false"
         >
-          <div class="mb-4 flex items-center justify-between">
+          <div class="mb-5 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-white">Card details</h2>
             <button type="button" class="text-sm text-slate-400 hover:text-white" (click)="close.emit()">Close</button>
           </div>
-          <div class="grid gap-4">
-            <label class="grid gap-1 text-sm text-slate-300">
-              Title
-              <input
-                class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-                [(ngModel)]="draftTitle"
-              />
-            </label>
-            <label class="grid gap-1 text-sm text-slate-300">
-              Description
-              <textarea
-                class="min-h-24 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-                [(ngModel)]="draftDescription"
-              ></textarea>
-            </label>
-            <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
-              <label class="grid gap-1 text-sm text-slate-300">
-                Priority
-                <select
-                  class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-                  [(ngModel)]="draftPriority"
+          <div class="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-4 text-sm">
+            <span class="text-slate-400">Title</span>
+            <input
+              class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              [(ngModel)]="draftTitle"
+            />
+
+            <span class="text-slate-400">Assignee</span>
+            <div class="relative min-w-0">
+              <button
+                type="button"
+                class="flex min-w-0 items-center gap-3 rounded-md text-left hover:text-white"
+                (click)="$event.stopPropagation(); assigneeMenuOpen = !assigneeMenuOpen"
+              >
+                <span
+                  class="flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
+                  [class]="selectedMember ? 'bg-sky-600 text-white' : 'bg-slate-700 text-slate-300'"
                 >
-                  <option [ngValue]="undefined">No priority</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                </select>
-              </label>
-              <label class="grid gap-1 text-sm text-slate-300">
-                Start date
-                <input
-                  type="date"
-                  class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-                  [(ngModel)]="draftDeadlineStartDate"
-                />
-              </label>
-              <label class="grid gap-1 text-sm text-slate-300">
-                End date
-                <input
-                  type="date"
-                  class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
-                  [(ngModel)]="draftDeadlineEndDate"
-                />
-              </label>
+                  @if (assigneeInitial) {
+                    {{ assigneeInitial }}
+                  } @else {
+                    <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                      <circle cx="12" cy="8" r="3"></circle>
+                      <path d="M5 19a7 7 0 0 1 14 0"></path>
+                    </svg>
+                  }
+                </span>
+                <span class="min-w-0 truncate text-slate-100">{{ assigneeLabel }}</span>
+              </button>
+              @if (assigneeMenuOpen) {
+                <div
+                  class="absolute left-0 top-full z-10 mt-2 max-h-52 w-64 overflow-y-auto rounded-md border border-slate-700 bg-slate-950 py-1 shadow-xl"
+                  (click)="$event.stopPropagation()"
+                >
+                  @for (member of members; track member.id) {
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-2 px-3 py-2 text-left text-slate-100 hover:bg-slate-800"
+                      [class.bg-slate-800]="member.id === draftAssigneeId"
+                      (click)="selectAssignee(member.id)"
+                    >
+                      <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-sky-600 text-[10px] font-semibold text-white">
+                        {{ member.name.trim().charAt(0).toUpperCase() }}
+                      </span>
+                      <span class="truncate">{{ member.name }}</span>
+                    </button>
+                  } @empty {
+                    <p class="px-3 py-2 text-slate-500">No board members</p>
+                  }
+                </div>
+              }
             </div>
+
+            <span class="text-slate-400">Due date</span>
+            <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              @if (!draftDeadlineStartDate && !draftDeadlineEndDate) {
+                <span class="text-slate-500 sm:col-span-2">No due date</span>
+              }
+              <input
+                type="date"
+                class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+                [(ngModel)]="draftDeadlineStartDate"
+                aria-label="Start date"
+              />
+              <input
+                type="date"
+                class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+                [(ngModel)]="draftDeadlineEndDate"
+                aria-label="End date"
+              />
+            </div>
+
+            <span class="text-slate-400">Projects</span>
+            <span class="text-slate-300">{{ projectsLabel }}</span>
+
+            <span class="self-start pt-2 text-slate-400">Description</span>
+            <textarea
+              class="min-h-24 rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              [(ngModel)]="draftDescription"
+            ></textarea>
+
+            <span class="text-slate-400">Priority</span>
+            <select
+              class="rounded border border-slate-700 bg-slate-950 px-3 py-2 text-white"
+              [(ngModel)]="draftPriority"
+            >
+              <option [ngValue]="undefined">No priority</option>
+              <option value="low">Low</option>
+              <option value="medium">Medium</option>
+              <option value="high">High</option>
+            </select>
           </div>
           <div class="mt-5 flex items-center justify-between gap-2">
             <button
@@ -89,4 +135,3 @@
         </div>
       </div>
     }
-  
