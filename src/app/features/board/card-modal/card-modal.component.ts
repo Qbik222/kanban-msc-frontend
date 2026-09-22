@@ -1,21 +1,36 @@
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { BoardMemberDto, Card } from '../../../models/board.models';
+import { BoardMemberDto, Card, CardActivityItem, CardComment } from '../../../models/board.models';
 
 @Component({
   selector: 'app-card-modal',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule, NgTemplateOutlet],
   templateUrl: './card-modal.component.html',
   styleUrl: './card-modal.component.scss',
 })
 export class CardModalComponent implements OnDestroy {
   @ViewChild('deadlineRoot') private deadlineRoot?: ElementRef<HTMLElement>;
   @ViewChild('deadlinePanel') private deadlinePanel?: ElementRef<HTMLElement>;
+  private commentEditor?: ElementRef<HTMLTextAreaElement>;
+
+  @ViewChild('commentEditor')
+  set commentEditorRef(field: ElementRef<HTMLTextAreaElement> | undefined) {
+    this.commentEditor = field;
+    if (field && Date.now() < this.editLockedUntil) {
+      field.nativeElement.focus();
+    }
+  }
 
   @Input() canToggleComplete = false;
   @Input() canArchive = false;
   @Input() canPurge = false;
+  @Input() canUpdateOwnComments = false;
+  @Input() canUpdateAnyComments = false;
+  @Input() canCreateComment = false;
+  @Input() currentUserId = '';
+  @Input() activity: CardActivityItem[] = [];
   @Input() togglingComplete = false;
   @Input() members: BoardMemberDto[] = [];
 
@@ -48,6 +63,15 @@ export class CardModalComponent implements OnDestroy {
     this.draftAssigneeId = value?.assigneeId ?? '';
     this.titleFocused = false;
     this.descriptionFocused = false;
+    this.editingCommentId = null;
+    this.editingDraft = '';
+    this.replyParentId = null;
+    this.replyDraft = '';
+    this.commentMenuId = null;
+    this.newComment = '';
+    this.diffItem = null;
+    this.diffFrom = '';
+    this.diffTo = '';
     this.lastSubmittedTitle = null;
     this.lastSubmittedDescription = null;
     this.assigneeMenuOpen = false;
@@ -62,7 +86,9 @@ export class CardModalComponent implements OnDestroy {
 
   @Output() close = new EventEmitter<void>();
   @Output() toggleComplete = new EventEmitter<Card>();
-  @Output() assigneeChange = new EventEmitter<string>();
+  @Output() assigneeChange = new EventEmitter<string | null>();
+  @Output() commentChange = new EventEmitter<{ commentId: string; text: string }>();
+  @Output() commentCreate = new EventEmitter<{ text: string; parentCommentId?: string }>();
   @Output() titleChange = new EventEmitter<string>();
   @Output() descriptionChange = new EventEmitter<string>();
   @Output() priorityChange = new EventEmitter<'low' | 'medium' | 'high' | null>();
@@ -78,6 +104,17 @@ export class CardModalComponent implements OnDestroy {
   draftPriority: 'low' | 'medium' | 'high' | undefined = undefined;
   titleFocused = false;
   descriptionFocused = false;
+  editingCommentId: string | null = null;
+  editingDraft = '';
+  private editLockedUntil = 0;
+  replyParentId: string | null = null;
+  replyDraft = '';
+  commentMenuId: string | null = null;
+  newComment = '';
+  diffItem: CardActivityItem | null = null;
+  diffFrom = '';
+  diffTo = '';
+  private brokenAvatars = new Set<string>();
   private lastSubmittedTitle: string | null = null;
   private lastSubmittedDescription: string | null = null;
   draftDeadlineStartDate = '';
@@ -171,6 +208,7 @@ export class CardModalComponent implements OnDestroy {
     this.assigneeMenuOpen = false;
     this.actionsMenuOpen = false;
     this.pendingAction = null;
+    this.commentMenuId = null;
     this.setDeadlineOpen(false);
   }
 
@@ -200,13 +238,208 @@ export class CardModalComponent implements OnDestroy {
     this.restore.emit(this.card);
   }
 
-  selectAssignee(userId: string): void {
+  selectAssignee(userId: string | null): void {
     this.assigneeMenuOpen = false;
-    if (!userId || userId === this.draftAssigneeId) {
+    const next = userId ?? '';
+    if (next === this.draftAssigneeId) {
       return;
     }
-    this.draftAssigneeId = userId;
+    this.draftAssigneeId = next;
     this.assigneeChange.emit(userId);
+  }
+
+  get sortedActivity(): CardActivityItem[] {
+    return [...this.activity].sort((left, right) => activityTime(right) - activityTime(left));
+  }
+
+  get rootComments(): CardComment[] {
+    const comments = this.card?.comments ?? [];
+    const ids = new Set(comments.map((comment) => comment._id));
+    return comments
+      .filter((comment) => !comment.parentCommentId || !ids.has(comment.parentCommentId))
+      .sort((left, right) => commentTime(left) - commentTime(right));
+  }
+
+  repliesOf(parent: CardComment): CardComment[] {
+    return (this.card?.comments ?? [])
+      .filter((comment) => comment.parentCommentId === parent._id)
+      .sort((left, right) => commentTime(left) - commentTime(right));
+  }
+
+  isOwnComment(comment: CardComment): boolean {
+    return !!this.currentUserId && (comment.authorId === this.currentUserId || comment.author?.id === this.currentUserId);
+  }
+
+  canEditComment(comment: CardComment): boolean {
+    return this.isOwnComment(comment) && (this.canUpdateOwnComments || this.canUpdateAnyComments);
+  }
+
+  canReplyToComment(comment: CardComment): boolean {
+    return !this.isOwnComment(comment) && this.canCreateComment;
+  }
+
+  commentAuthorName(comment: CardComment): string {
+    return comment.author?.name || this.actorName(comment.authorId);
+  }
+
+  commentInitial(comment: CardComment): string {
+    const name = this.commentAuthorName(comment).trim();
+    return name ? name.charAt(0).toUpperCase() : '?';
+  }
+
+  commentAvatar(comment: CardComment): string | null {
+    const url = comment.author?.avatarUrl?.trim();
+    if (!url || this.brokenAvatars.has(comment._id)) {
+      return null;
+    }
+    return url;
+  }
+
+  onAvatarError(commentId: string): void {
+    this.brokenAvatars.add(commentId);
+  }
+
+  commentDate(comment: CardComment): string {
+    if (!comment.createdAt) {
+      return '';
+    }
+    const date = new Date(comment.createdAt);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
+
+  toggleCommentMenu(commentId: string): void {
+    this.assigneeMenuOpen = false;
+    this.actionsMenuOpen = false;
+    this.pendingAction = null;
+    this.commentMenuId = this.commentMenuId === commentId ? null : commentId;
+  }
+
+  startEdit(comment: CardComment): void {
+    if (!this.canEditComment(comment)) {
+      return;
+    }
+    this.commentMenuId = null;
+    this.replyParentId = null;
+    this.replyDraft = '';
+    this.editingCommentId = comment._id;
+    this.editingDraft = comment.text;
+    this.editLockedUntil = Date.now() + 300;
+  }
+
+  commitComment(comment: CardComment): void {
+    if (this.editingCommentId !== comment._id) {
+      return;
+    }
+    if (Date.now() < this.editLockedUntil) {
+      this.commentEditor?.nativeElement.focus();
+      return;
+    }
+    const next = this.editingDraft.trim();
+    this.editingCommentId = null;
+    this.editingDraft = '';
+    if (!next || next === comment.text || !this.card) {
+      return;
+    }
+    this.commentChange.emit({ commentId: comment._id, text: next });
+  }
+
+  cancelComment(event: Event): void {
+    event.preventDefault();
+    this.editingCommentId = null;
+    this.editingDraft = '';
+  }
+
+  startReply(comment: CardComment): void {
+    this.commentMenuId = null;
+    this.editingCommentId = null;
+    this.editingDraft = '';
+    this.replyParentId = comment._id;
+    this.replyDraft = '';
+  }
+
+  cancelReply(): void {
+    this.replyParentId = null;
+    this.replyDraft = '';
+  }
+
+  submitReply(comment: CardComment): void {
+    const text = this.replyDraft.trim();
+    if (!text || !this.canCreateComment) {
+      return;
+    }
+    this.replyParentId = null;
+    this.replyDraft = '';
+    this.commentCreate.emit({ text, parentCommentId: comment._id });
+  }
+
+  actorName(actorId: string): string {
+    return this.members.find((member) => member.id === actorId)?.name || actorId.slice(0, 8);
+  }
+
+  activityText(item: CardActivityItem): string {
+    if (item.type === 'assignee_changed') {
+      return `${this.actorName(item.actorId)} changed assignee from ${this.assigneeActivityLabel(item.assignee?.fromUserId)} to ${this.assigneeActivityLabel(item.assignee?.toUserId)}`;
+    }
+    if (item.type === 'deadline_changed') {
+      return `${this.actorName(item.actorId)} changed deadline from ${this.deadlineActivityLabel(item.deadline?.from)} to ${this.deadlineActivityLabel(item.deadline?.to)}`;
+    }
+    return `${this.actorName(item.actorId)} changed description`;
+  }
+
+  openDescriptionDiff(item: CardActivityItem): void {
+    const pair = descriptionPair(item);
+    this.diffFrom = pair.from;
+    this.diffTo = pair.to;
+    this.diffItem = item;
+  }
+
+  get descriptionDiff(): { type: 'same' | 'add' | 'del'; text: string }[] {
+    return wordDiff(this.diffFrom, this.diffTo);
+  }
+
+  submitComment(): void {
+    const text = this.newComment.trim();
+    if (!text || !this.canCreateComment) {
+      return;
+    }
+    this.newComment = '';
+    this.commentCreate.emit({ text });
+  }
+
+  private assigneeActivityLabel(value: unknown): string {
+    if (value == null || value === '') {
+      return 'Unassigned';
+    }
+    const id = String(value);
+    return this.members.find((member) => member.id === id)?.name || id.slice(0, 8);
+  }
+
+  private deadlineActivityLabel(value: unknown): string {
+    if (value == null || value === '') {
+      return 'none';
+    }
+    if (typeof value === 'string') {
+      return value.slice(0, 10);
+    }
+    if (typeof value === 'object') {
+      const dates = value as { startDate?: string; endDate?: string };
+      const start = dates.startDate ? String(dates.startDate).slice(0, 10) : '';
+      const end = dates.endDate ? String(dates.endDate).slice(0, 10) : '';
+      if (start && end) {
+        return `${start} – ${end}`;
+      }
+      return start || end || 'none';
+    }
+    return 'none';
   }
 
   revertAssignee(): void {
@@ -460,4 +693,66 @@ function isCalendarDay(value: string): boolean {
   const [year, month, day] = value.split('-').map(Number);
   const date = new Date(year, month - 1, day);
   return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
+}
+
+function activityTime(item: CardActivityItem): number {
+  return timestamp(item.createdAt);
+}
+
+function commentTime(comment: CardComment): number {
+  return timestamp(comment.createdAt);
+}
+
+function timestamp(value: string | Date | undefined): number {
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function descriptionPair(item: CardActivityItem): { from: string; to: string } {
+  return {
+    from: item.description?.from ?? '',
+    to: item.description?.to ?? '',
+  };
+}
+
+function wordDiff(from: string, to: string): { type: 'same' | 'add' | 'del'; text: string }[] {
+  if (!from && !to) {
+    return [];
+  }
+  const before = from.split(/(\s+)/);
+  const after = to.split(/(\s+)/);
+  const rows = before.length;
+  const cols = after.length;
+  const scores = Array.from({ length: rows + 1 }, () => Array<number>(cols + 1).fill(0));
+  for (let row = rows - 1; row >= 0; row--) {
+    for (let col = cols - 1; col >= 0; col--) {
+      scores[row][col] =
+        before[row] === after[col]
+          ? scores[row + 1][col + 1] + 1
+          : Math.max(scores[row + 1][col], scores[row][col + 1]);
+    }
+  }
+  const tokens: { type: 'same' | 'add' | 'del'; text: string }[] = [];
+  let row = 0;
+  let col = 0;
+  while (row < rows && col < cols) {
+    if (before[row] === after[col]) {
+      tokens.push({ type: 'same', text: before[row] });
+      row++;
+      col++;
+    } else if (scores[row + 1][col] >= scores[row][col + 1]) {
+      tokens.push({ type: 'del', text: before[row] });
+      row++;
+    } else {
+      tokens.push({ type: 'add', text: after[col] });
+      col++;
+    }
+  }
+  while (row < rows) {
+    tokens.push({ type: 'del', text: before[row++] });
+  }
+  while (col < cols) {
+    tokens.push({ type: 'add', text: after[col++] });
+  }
+  return tokens;
 }

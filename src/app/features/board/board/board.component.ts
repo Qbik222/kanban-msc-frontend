@@ -9,7 +9,7 @@ import { CardArchiveService } from '../../../data/card-archive.service';
 import { BoardStore } from '../../../state/board.store';
 import { TeamStore } from '../../../state/team.store';
 import { SocketService } from '../../../realtime/socket.service';
-import { BoardMemberDto, Card } from '../../../models/board.models';
+import { BoardMemberDto, Card, CardActivityItem } from '../../../models/board.models';
 import { TeamMember } from '../../../models/team.models';
 import { ColumnComponent } from '../column/column.component';
 import { AiAssistantComponent } from '../ai-assistant/ai-assistant.component';
@@ -52,6 +52,8 @@ export class BoardComponent implements OnDestroy {
   skeletonStartDate = '';
   skeletonEndDate = '';
   selectedCardId: string | null = null;
+  cardActivity: CardActivityItem[] = [];
+  private activityRequest = 0;
   togglingCardIds: ReadonlySet<string> = new Set();
   boardMembers: BoardMemberDto[] = [];
   private assigneeRequestId = 0;
@@ -79,6 +81,16 @@ export class BoardComponent implements OnDestroy {
         }),
       )
       .subscribe();
+
+    this.socket.cardActivityRefresh$.pipe(takeUntilDestroyed()).subscribe((cardId) => {
+      if (!this.selectedCardId) {
+        return;
+      }
+      if (cardId && cardId !== this.selectedCardId) {
+        return;
+      }
+      void this.loadCardActivity(this.selectedCardId);
+    });
   }
 
   ngOnDestroy(): void {
@@ -258,6 +270,7 @@ export class BoardComponent implements OnDestroy {
       return;
     }
     this.selectedCardId = card.id;
+    void this.loadCardActivity(card.id);
   }
 
   archivedCards(columnId: string): Card[] {
@@ -340,11 +353,17 @@ export class BoardComponent implements OnDestroy {
 
   closeCardModal(): void {
     this.selectedCardId = null;
+    this.cardActivity = [];
+    this.activityRequest++;
   }
 
-  async assignCard(cardId: string, userId: string): Promise<void> {
+  async assignCard(cardId: string, userId: string | null): Promise<void> {
+    if (userId === '') {
+      return;
+    }
     const card = this.findCard(cardId);
-    if (!card || !userId || card.assigneeId === userId) {
+    const current = card?.assigneeId ?? null;
+    if (!card || userId === current) {
       return;
     }
     if (!this.boardStore.permissions().has('card:update')) {
@@ -363,6 +382,7 @@ export class BoardComponent implements OnDestroy {
         return;
       }
       this.boardStore.upsertCard(updated);
+      void this.loadCardActivity(card.id);
     } catch (e) {
       if (requestId !== this.assigneeRequestId) {
         return;
@@ -444,6 +464,7 @@ export class BoardComponent implements OnDestroy {
         return;
       }
       this.boardStore.upsertCard(updated);
+      void this.loadCardActivity(cardId);
     } catch (e) {
       if (this.deadlineRequestIds.get(cardId) !== requestId) {
         return;
@@ -473,6 +494,7 @@ export class BoardComponent implements OnDestroy {
         return;
       }
       this.boardStore.upsertCard(updated);
+      void this.loadCardActivity(cardId);
     } catch (e) {
       if (this.descriptionRequestIds.get(cardId) !== requestId) {
         return;
@@ -514,11 +536,83 @@ export class BoardComponent implements OnDestroy {
     }
   }
 
+  async addComment(cardId: string, text: string, parentCommentId?: string): Promise<void> {
+    const next = text.trim();
+    const card = this.findCard(cardId) ?? this.archive.find(cardId);
+    if (!card || !next) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('comment:create')) {
+      this.boardStore.setError('No permission to comment');
+      return;
+    }
+    this.boardStore.setError(null);
+    try {
+      const body = parentCommentId ? { text: next, parentCommentId } : { text: next };
+      const updated = await firstValueFrom(this.api.addComment(cardId, body));
+      this.replaceVisibleCard(updated);
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to add comment');
+    }
+  }
+
+  async updateComment(cardId: string, commentId: string, text: string): Promise<void> {
+    const next = text.trim();
+    const card = this.findCard(cardId) ?? this.archive.find(cardId);
+    const comment = card?.comments?.find((item) => item._id === commentId);
+    if (!card || !comment || !next || comment.text === next) {
+      return;
+    }
+    const mine = comment.authorId === this.boardStore.user()?.id;
+    const allowed = mine
+      ? this.boardStore.permissions().has('comment:update:own')
+      : this.boardStore.permissions().has('comment:update:any');
+    if (!allowed) {
+      this.replaceVisibleCard({ ...card, comments: [...(card.comments ?? [])] });
+      this.boardStore.setError('No permission to edit this comment');
+      return;
+    }
+    this.boardStore.setError(null);
+    try {
+      const updated = await firstValueFrom(this.api.updateComment(cardId, commentId, { text: next }));
+      this.replaceVisibleCard(updated);
+    } catch (e) {
+      this.replaceVisibleCard({ ...card, comments: [...(card.comments ?? [])] });
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update comment');
+    }
+  }
+
+  private replaceVisibleCard(card: Card): void {
+    if (this.findCard(card.id)) {
+      this.boardStore.upsertCard(card);
+      return;
+    }
+    if (card.isDeleted || this.archive.find(card.id)) {
+      this.archive.remember({ ...card, isDeleted: true });
+    }
+  }
+
   activeModalCard(): Card | null {
     if (!this.selectedCardId) {
       return null;
     }
     return this.findCard(this.selectedCardId) ?? this.archive.find(this.selectedCardId);
+  }
+
+  private async loadCardActivity(cardId: string): Promise<void> {
+    const request = ++this.activityRequest;
+    try {
+      const response = await firstValueFrom(this.api.getCardActivity(cardId));
+      if (request !== this.activityRequest || this.selectedCardId !== cardId) {
+        return;
+      }
+      this.cardActivity = response.items ?? [];
+    } catch (e) {
+      if (request !== this.activityRequest || this.selectedCardId !== cardId) {
+        return;
+      }
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to load activity');
+    }
   }
 
   private pruneArchive(): void {

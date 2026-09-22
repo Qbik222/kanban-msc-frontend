@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import { BoardDetails, BoardMemberDto, BoardMemberRole, BoardSummary, Card, CardDeadline } from '../models/board.models';
+import { BoardDetails, BoardMemberDto, BoardMemberRole, BoardSummary, Card, CardActivityResponse, CardDeadline } from '../models/board.models';
 
 @Injectable({ providedIn: 'root' })
 export class BoardApiService {
@@ -84,7 +84,7 @@ export class BoardApiService {
         title: string;
         description: string;
         priority: 'low' | 'medium' | 'high' | null;
-        assigneeId: string;
+        assigneeId: string | null;
         projectIds: string[];
         deadline: CardDeadline | null;
         taskComplete: boolean;
@@ -109,11 +109,19 @@ export class BoardApiService {
     return this.http.post<Card>(`${this.api}/cards/${id}/restore`, {});
   }
 
-  addComment(cardId: string, body: { text: string }): Observable<Card> {
+  addComment(cardId: string, body: { text: string; parentCommentId?: string }): Observable<Card> {
     return this.http.post<Card>(`${this.api}/cards/${cardId}/comments`, body);
   }
 
   deleteComment(cardId: string, commentId: string): Observable<Card> {
     return this.http.delete<Card>(`${this.api}/cards/${cardId}/comments/${commentId}`);
+  }
+
+  updateComment(cardId: string, commentId: string, body: { text: string }): Observable<Card> {
+    return this.http.patch<Card>(`${this.api}/cards/${cardId}/comments/${commentId}`, body);
+  }
+
+  getCardActivity(cardId: string): Observable<CardActivityResponse> {
+    return this.http.get<CardActivityResponse>(`${this.api}/cards/${cardId}/activity`);
   }
 }

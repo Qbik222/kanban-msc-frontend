@@ -1,0 +1,23 @@
+.card-modal {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(71 85 105) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background-color: rgb(71 85 105);
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background-clip: padding-box;
+  }
+
+  &:hover::-webkit-scrollbar-thumb {
+    background-color: rgb(100 116 139);
+  }
+}

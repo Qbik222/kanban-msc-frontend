@@ -68,6 +68,20 @@
               [style.top.px]="menuTop"
               [style.left.px]="menuLeft"
             >
+              <button
+                type="button"
+                class="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                [class.bg-slate-800]="!card.assigneeId"
+                (click)="selectAssignee(null)"
+              >
+                <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-700 text-slate-300">
+                  <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                    <circle cx="12" cy="8" r="3"></circle>
+                    <path d="M5 19a7 7 0 0 1 14 0"></path>
+                  </svg>
+                </span>
+                <span class="truncate">Unassigned</span>
+              </button>
               @for (member of members; track member.id) {
                 <button
                   type="button"

@@ -1,8 +1,42 @@
+export interface CommentAuthor {
+  id: string;
+  name: string;
+  avatarUrl?: string;
+}
+
 export interface CardComment {
   _id: string;
   text: string;
   authorId: string;
   createdAt?: string | Date;
+  author?: CommentAuthor;
+  parentCommentId?: string | null;
+}
+
+export type CardActivityType = 'deadline_changed' | 'assignee_changed' | 'description_changed';
+
+export interface CardActivityItem {
+  _id: string;
+  type: CardActivityType;
+  actorId: string;
+  createdAt?: string | Date;
+  description?: {
+    from?: string | null;
+    to?: string | null;
+  };
+  assignee?: {
+    fromUserId?: string | null;
+    toUserId?: string | null;
+  };
+  deadline?: {
+    from?: { startDate?: string | Date; endDate?: string | Date } | null;
+    to?: { startDate?: string | Date; endDate?: string | Date } | null;
+  };
+}
+
+export interface CardActivityResponse {
+  cardId: string;
+  items: CardActivityItem[];
 }
 
 export interface CardDeadline {

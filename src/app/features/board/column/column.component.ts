@@ -60,7 +60,7 @@ export class ColumnComponent implements OnDestroy {
   @Output() archiveCard = new EventEmitter<Card>();
   @Output() purgeCard = new EventEmitter<Card>();
   @Output() toggleCardComplete = new EventEmitter<Card>();
-  @Output() assigneeChange = new EventEmitter<{ card: Card; userId: string }>();
+  @Output() assigneeChange = new EventEmitter<{ card: Card; userId: string | null }>();
   @Output() titleChange = new EventEmitter<{ card: Card; title: string }>();
   @Output() deadlineChange = new EventEmitter<{ card: Card; deadline: { startDate: string; endDate: string } | null }>();
   @Output() skeletonTitleChange = new EventEmitter<string>();

@@ -1,5 +1,6 @@
 import { Injectable, effect, inject } from '@angular/core';
 import { Router } from '@angular/router';
+import { Subject } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { environment } from '../../environments/environment';
 import { AuthService } from '../core/auth/auth.service';
@@ -14,6 +15,9 @@ export class SocketService {
   private readonly boardStore = inject(BoardStore);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+
+  /** cardId when known; null means refresh whichever card modal is open. */
+  readonly cardActivityRefresh$ = new Subject<string | null>();
 
   private socket: Socket | null = null;
   private listenersBound = false;
@@ -151,6 +155,7 @@ export class SocketService {
 
     s.on('card:updated', (card: Card) => {
       this.boardStore.upsertCard(card);
+      this.cardActivityRefresh$.next(card.id);
     });
 
     s.on('card:moved', (snapshot: BoardDetails) => {
@@ -158,7 +163,19 @@ export class SocketService {
     });
 
     s.on('comment:added', (card: Card) => {
-      this.boardStore.upsertCard(card);
+      if (!card.isDeleted) {
+        this.boardStore.upsertCard(card);
+      }
+    });
+
+    s.on('comment:updated', (card: Card) => {
+      if (!card.isDeleted) {
+        this.boardStore.upsertCard(card);
+      }
+    });
+
+    s.on('card:activity', () => {
+      this.cardActivityRefresh$.next(null);
     });
   }
 }

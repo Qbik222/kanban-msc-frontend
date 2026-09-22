@@ -83,6 +83,11 @@
         [canToggleComplete]="boardStore.permissions().has('card:update') && !activeModalCard()?.isDeleted"
         [canArchive]="boardStore.permissions().has('card:delete')"
         [canPurge]="boardStore.permissions().has('card:purge')"
+        [canUpdateOwnComments]="boardStore.permissions().has('comment:update:own')"
+        [canUpdateAnyComments]="boardStore.permissions().has('comment:update:any')"
+        [canCreateComment]="boardStore.permissions().has('comment:create')"
+        [currentUserId]="boardStore.user()?.id ?? ''"
+        [activity]="cardActivity"
         [togglingComplete]="togglingCardIds.has(activeModalCard()?.id ?? '')"
         (close)="closeCardModal()"
         (toggleComplete)="toggleCardComplete($event)"
@@ -94,6 +99,8 @@
         (archive)="archiveCard($event)"
         (purge)="purgeCard($event)"
         (restore)="restoreCard($event)"
+        (commentChange)="updateComment(activeModalCard()?.id ?? '', $event.commentId, $event.text)"
+        (commentCreate)="addComment(activeModalCard()?.id ?? '', $event.text, $event.parentCommentId)"
       />
     </div>
   

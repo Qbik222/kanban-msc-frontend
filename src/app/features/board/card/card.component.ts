@@ -26,7 +26,7 @@ export class CardComponent implements OnChanges, OnDestroy {
   @Output() toggleComplete = new EventEmitter<void>();
   @Output() archive = new EventEmitter<void>();
   @Output() purge = new EventEmitter<void>();
-  @Output() assigneeChange = new EventEmitter<string>();
+  @Output() assigneeChange = new EventEmitter<string | null>();
   @Output() titleChange = new EventEmitter<string>();
   @Output() deadlineChange = new EventEmitter<{ startDate: string; endDate: string } | null>();
 
@@ -194,8 +194,15 @@ export class CardComponent implements OnChanges, OnDestroy {
     setTimeout(() => this.refitAssigneeMenu());
   }
 
-  selectAssignee(userId: string): void {
+  selectAssignee(userId: string | null): void {
     this.assigneeMenuOpen = false;
+    if (userId === null) {
+      if (!this.card.assigneeId) {
+        return;
+      }
+      this.assigneeChange.emit(null);
+      return;
+    }
     if (!userId || userId === this.card.assigneeId) {
       return;
     }
