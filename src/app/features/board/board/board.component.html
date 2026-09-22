@@ -45,6 +45,9 @@
               [canCreateCard]="boardStore.canCreateCard()"
               [canMoveCards]="boardStore.canMoveCards()"
               [canUpdateCards]="boardStore.permissions().has('card:update')"
+              [canArchiveCards]="boardStore.permissions().has('card:delete')"
+              [canPurgeCards]="boardStore.permissions().has('card:purge')"
+              [archivedCards]="archivedCards(col.id)"
               [members]="boardMembers"
               [creatingCard]="creatingCardColumnId === col.id"
               [togglingCardIds]="togglingCardIds"
@@ -56,6 +59,8 @@
               [skeletonEndDate]="skeletonEndDate"
               (addCard)="onAddCard(col.id)"
               (openCard)="openCard($event)"
+              (archiveCard)="archiveCard($event)"
+              (purgeCard)="purgeCard($event)"
               (toggleCardComplete)="toggleCardComplete($event)"
               (assigneeChange)="assignCard($event.card.id, $event.userId)"
               (titleChange)="renameCard($event.card.id, $event.title)"
@@ -75,7 +80,9 @@
       <app-card-modal
         [card]="activeModalCard()"
         [members]="boardMembers"
-        [canToggleComplete]="boardStore.permissions().has('card:update')"
+        [canToggleComplete]="boardStore.permissions().has('card:update') && !activeModalCard()?.isDeleted"
+        [canArchive]="boardStore.permissions().has('card:delete')"
+        [canPurge]="boardStore.permissions().has('card:purge')"
         [togglingComplete]="togglingCardIds.has(activeModalCard()?.id ?? '')"
         (close)="closeCardModal()"
         (toggleComplete)="toggleCardComplete($event)"
@@ -84,6 +91,9 @@
         (descriptionChange)="updateCardDescription(activeModalCard()?.id ?? '', $event)"
         (priorityChange)="updateCardPriority(activeModalCard()?.id ?? '', $event)"
         (deadlineChange)="updateCardDeadline(activeModalCard()?.id ?? '', $event)"
+        (archive)="archiveCard($event)"
+        (purge)="purgeCard($event)"
+        (restore)="restoreCard($event)"
       />
     </div>
   

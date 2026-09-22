@@ -295,6 +295,17 @@ export const BoardStore = signalStore(
         }
         patchState(store, { activeBoard: next });
       },
+      removeCard(cardId: string): void {
+        const cur = store.activeBoard();
+        if (!cur) {
+          return;
+        }
+        const next = cloneBoard(cur);
+        for (const col of next.columns) {
+          col.cards = col.cards.filter((card) => card.id !== cardId);
+        }
+        patchState(store, { activeBoard: next });
+      },
       applyOptimisticMove(cardId: string, targetColumnId: string, newOrder: number): void {
         const cur = store.activeBoard();
         if (!cur) {

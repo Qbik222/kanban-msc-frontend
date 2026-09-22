@@ -32,6 +32,7 @@ describe('ROLE_PERMISSIONS (sync with docs/permissions.md)', () => {
         'card:update',
         'card:move',
         'card:delete',
+        'card:purge',
         'comment:create',
         'comment:delete:any',
         'comment:delete:own',

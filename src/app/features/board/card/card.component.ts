@@ -13,19 +13,29 @@ export class CardComponent implements OnChanges, OnDestroy {
   @ViewChild('assigneePanel') private assigneePanel?: ElementRef<HTMLElement>;
   @ViewChild('deadlineRoot') private deadlineRoot?: ElementRef<HTMLElement>;
   @ViewChild('deadlinePanel') private deadlinePanel?: ElementRef<HTMLElement>;
+  @ViewChild('actionsRoot') private actionsRoot?: ElementRef<HTMLElement>;
+  @ViewChild('actionsPanel') private actionsPanel?: ElementRef<HTMLElement>;
 
   @Input({ required: true }) card!: Card;
   @Input() members: BoardMemberDto[] = [];
   @Input() canToggleComplete = false;
+  @Input() canArchive = false;
+  @Input() canPurge = false;
   @Input() togglingComplete = false;
   @Output() clicked = new EventEmitter<void>();
   @Output() toggleComplete = new EventEmitter<void>();
+  @Output() archive = new EventEmitter<void>();
+  @Output() purge = new EventEmitter<void>();
   @Output() assigneeChange = new EventEmitter<string>();
   @Output() titleChange = new EventEmitter<string>();
   @Output() deadlineChange = new EventEmitter<{ startDate: string; endDate: string } | null>();
 
   readonly weekdayLabels = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
   assigneeMenuOpen = false;
+  actionsMenuOpen = false;
+  actionsTop = 0;
+  actionsLeft = 0;
+  pendingAction: 'archive' | 'purge' | null = null;
   menuTop = 0;
   menuLeft = 0;
   draftTitle = '';
@@ -43,6 +53,7 @@ export class CardComponent implements OnChanges, OnDestroy {
   private readonly refitDeadlineListener = () => {
     this.refitDeadlinePanel();
     this.refitAssigneeMenu();
+    this.refitActionsMenu();
   };
 
   ngOnDestroy(): void {
@@ -132,14 +143,40 @@ export class CardComponent implements OnChanges, OnDestroy {
     if (this.deadlineOpen && !(target && this.deadlineRoot?.nativeElement.contains(target))) {
       this.setDeadlineOpen(false);
     }
+    if (this.actionsMenuOpen && !(target && this.actionsRoot?.nativeElement.contains(target))) {
+      this.closeActionsMenu();
+    }
   }
 
   onCardClick(event: MouseEvent): void {
     const target = event.target as HTMLElement | null;
-    if (target?.closest('[data-assignee-control], [data-title-control], [data-deadline-control]')) {
+    if (target?.closest('[data-assignee-control], [data-title-control], [data-deadline-control], [data-actions-control]')) {
       return;
     }
     this.clicked.emit();
+  }
+
+  toggleActionsMenu(anchor: HTMLElement): void {
+    const nextOpen = !this.actionsMenuOpen;
+    this.actionsMenuOpen = nextOpen;
+    this.pendingAction = null;
+    this.syncViewportWatch();
+    if (!nextOpen) {
+      return;
+    }
+    const rect = anchor.getBoundingClientRect();
+    this.actionsTop = rect.bottom + 4;
+    this.actionsLeft = rect.right - 176;
+    setTimeout(() => this.refitActionsMenu());
+  }
+
+  confirmPendingAction(): void {
+    if (this.pendingAction === 'archive') {
+      this.archive.emit();
+    } else if (this.pendingAction === 'purge') {
+      this.purge.emit();
+    }
+    this.closeActionsMenu();
   }
 
   toggleAssigneeMenu(anchor: HTMLElement): void {
@@ -300,7 +337,7 @@ export class CardComponent implements OnChanges, OnDestroy {
   }
 
   private syncViewportWatch(): void {
-    const watch = this.deadlineOpen || this.assigneeMenuOpen;
+    const watch = this.deadlineOpen || this.assigneeMenuOpen || this.actionsMenuOpen;
     if (watch === this.viewportWatching) {
       return;
     }
@@ -331,6 +368,23 @@ export class CardComponent implements OnChanges, OnDestroy {
     const position = this.placeInViewport(anchor, panel);
     this.menuTop = position.top;
     this.menuLeft = position.left;
+  }
+
+  private closeActionsMenu(): void {
+    this.actionsMenuOpen = false;
+    this.pendingAction = null;
+    this.syncViewportWatch();
+  }
+
+  private refitActionsMenu(): void {
+    const panel = this.actionsPanel?.nativeElement;
+    const anchor = this.actionsRoot?.nativeElement.querySelector('button');
+    if (!this.actionsMenuOpen || !panel || !anchor) {
+      return;
+    }
+    const position = this.placeInViewport(anchor, panel);
+    this.actionsTop = position.top;
+    this.actionsLeft = position.left;
   }
 
   private refitDeadlinePanel(): void {

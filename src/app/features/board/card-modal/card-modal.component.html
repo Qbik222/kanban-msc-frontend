@@ -12,7 +12,55 @@
         >
           <div class="mb-5 flex items-center justify-between">
             <h2 class="text-lg font-semibold text-white">Card details</h2>
-            <button type="button" class="text-sm text-slate-400 hover:text-white" (click)="close.emit()">Close</button>
+            <div class="flex items-center gap-3">
+              @if (canArchive || canPurge) {
+                <div class="relative" (click)="$event.stopPropagation()">
+                  <button
+                    type="button"
+                    class="flex size-7 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 hover:text-white"
+                    aria-label="Card actions"
+                    (click)="toggleActionsMenu()"
+                  >
+                    <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <circle cx="5" cy="12" r="1.6"></circle>
+                      <circle cx="12" cy="12" r="1.6"></circle>
+                      <circle cx="19" cy="12" r="1.6"></circle>
+                    </svg>
+                  </button>
+                  @if (actionsMenuOpen) {
+                    <div class="absolute right-0 top-full z-10 mt-2 w-48 rounded-md border border-slate-700 bg-slate-950 py-1 text-sm text-slate-100 shadow-xl">
+                      @if (pendingAction) {
+                        <p class="px-3 py-2 text-xs text-slate-300">
+                          {{ pendingAction === 'archive' ? 'Archive this card?' : 'Delete this card forever?' }}
+                        </p>
+                        <button type="button" class="block w-full px-3 py-1.5 text-left text-red-300 hover:bg-slate-800" (click)="confirmPendingAction()">
+                          Confirm
+                        </button>
+                        <button type="button" class="block w-full px-3 py-1.5 text-left text-slate-300 hover:bg-slate-800" (click)="pendingAction = null">
+                          Cancel
+                        </button>
+                      } @else {
+                        @if (card.isDeleted && canArchive) {
+                          <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-slate-800" (click)="restoreCard()">
+                            Unarchive
+                          </button>
+                        } @else if (canArchive) {
+                          <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-slate-800" (click)="pendingAction = 'archive'">
+                            Archive
+                          </button>
+                        }
+                        @if (canPurge) {
+                          <button type="button" class="block w-full px-3 py-1.5 text-left text-red-300 hover:bg-slate-800" (click)="pendingAction = 'purge'">
+                            Delete forever
+                          </button>
+                        }
+                      }
+                    </div>
+                  }
+                </div>
+              }
+              <button type="button" class="text-sm text-slate-400 hover:text-white" (click)="close.emit()">Close</button>
+            </div>
           </div>
           <div class="grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-4 gap-y-4 text-sm">
             <span class="text-slate-400">Title</span>

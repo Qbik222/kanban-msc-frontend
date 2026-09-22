@@ -14,6 +14,8 @@ export class CardModalComponent implements OnDestroy {
   @ViewChild('deadlinePanel') private deadlinePanel?: ElementRef<HTMLElement>;
 
   @Input() canToggleComplete = false;
+  @Input() canArchive = false;
+  @Input() canPurge = false;
   @Input() togglingComplete = false;
   @Input() members: BoardMemberDto[] = [];
 
@@ -49,6 +51,8 @@ export class CardModalComponent implements OnDestroy {
     this.lastSubmittedTitle = null;
     this.lastSubmittedDescription = null;
     this.assigneeMenuOpen = false;
+    this.actionsMenuOpen = false;
+    this.pendingAction = null;
     this.setDeadlineOpen(false);
   }
 
@@ -63,6 +67,9 @@ export class CardModalComponent implements OnDestroy {
   @Output() descriptionChange = new EventEmitter<string>();
   @Output() priorityChange = new EventEmitter<'low' | 'medium' | 'high' | null>();
   @Output() deadlineChange = new EventEmitter<{ startDate: string; endDate: string } | null>();
+  @Output() archive = new EventEmitter<Card>();
+  @Output() purge = new EventEmitter<Card>();
+  @Output() restore = new EventEmitter<Card>();
 
   private _card: Card | null = null;
 
@@ -77,6 +84,8 @@ export class CardModalComponent implements OnDestroy {
   draftDeadlineEndDate = '';
   draftAssigneeId = '';
   assigneeMenuOpen = false;
+  actionsMenuOpen = false;
+  pendingAction: 'archive' | 'purge' | null = null;
   deadlineOpen = false;
   deadlineTop = 0;
   deadlineLeft = 0;
@@ -160,7 +169,35 @@ export class CardModalComponent implements OnDestroy {
 
   dismissOverlays(): void {
     this.assigneeMenuOpen = false;
+    this.actionsMenuOpen = false;
+    this.pendingAction = null;
     this.setDeadlineOpen(false);
+  }
+
+  toggleActionsMenu(): void {
+    this.actionsMenuOpen = !this.actionsMenuOpen;
+    this.pendingAction = null;
+  }
+
+  confirmPendingAction(): void {
+    if (!this.card) {
+      return;
+    }
+    if (this.pendingAction === 'archive') {
+      this.archive.emit(this.card);
+    } else if (this.pendingAction === 'purge') {
+      this.purge.emit(this.card);
+    }
+    this.actionsMenuOpen = false;
+    this.pendingAction = null;
+  }
+
+  restoreCard(): void {
+    if (!this.card?.isDeleted) {
+      return;
+    }
+    this.actionsMenuOpen = false;
+    this.restore.emit(this.card);
   }
 
   selectAssignee(userId: string): void {

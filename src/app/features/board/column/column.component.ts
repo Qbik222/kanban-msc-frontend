@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, OnDestroy, Output, ViewChild } from '@angular/core';
 import { CdkDragDrop, DragDropModule } from '@angular/cdk/drag-drop';
 import { FormsModule } from '@angular/forms';
 import { BoardMemberDto, Column, Card } from '../../../models/board.models';
@@ -17,11 +17,15 @@ export class ColumnComponent implements OnDestroy {
   @ViewChild('assigneePanel') private assigneePanel?: ElementRef<HTMLElement>;
   @ViewChild('deadlineRoot') private deadlineRoot?: ElementRef<HTMLElement>;
   @ViewChild('deadlinePanel') private deadlinePanel?: ElementRef<HTMLElement>;
+  @ViewChild('archiveRoot') private archiveRoot?: ElementRef<HTMLElement>;
 
   @Input({ required: true }) column!: Column;
   @Input() canCreateCard = false;
   @Input() canMoveCards = false;
   @Input() canUpdateCards = false;
+  @Input() canArchiveCards = false;
+  @Input() canPurgeCards = false;
+  @Input() archivedCards: Card[] = [];
   @Input() members: BoardMemberDto[] = [];
   @Input() creatingCard = false;
   @Input() togglingCardIds: ReadonlySet<string> = new Set();
@@ -53,6 +57,8 @@ export class ColumnComponent implements OnDestroy {
   @Output() dropped = new EventEmitter<CdkDragDrop<Card[]>>();
   @Output() addCard = new EventEmitter<void>();
   @Output() openCard = new EventEmitter<Card>();
+  @Output() archiveCard = new EventEmitter<Card>();
+  @Output() purgeCard = new EventEmitter<Card>();
   @Output() toggleCardComplete = new EventEmitter<Card>();
   @Output() assigneeChange = new EventEmitter<{ card: Card; userId: string }>();
   @Output() titleChange = new EventEmitter<{ card: Card; title: string }>();
@@ -64,6 +70,8 @@ export class ColumnComponent implements OnDestroy {
   @Output() saveSkeleton = new EventEmitter<void>();
   @Output() cancelSkeleton = new EventEmitter<void>();
 
+  archiveMenuOpen = false;
+  archiveModalOpen = false;
   assigneeMenuOpen = false;
   menuTop = 0;
   menuLeft = 0;
@@ -82,6 +90,23 @@ export class ColumnComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.unbindViewportWatch();
+  }
+
+  @HostListener('document:click', ['$event'])
+  closeArchiveMenu(event: MouseEvent): void {
+    const target = event.target as Node | null;
+    if (this.archiveMenuOpen && !(target && this.archiveRoot?.nativeElement.contains(target))) {
+      this.archiveMenuOpen = false;
+    }
+  }
+
+  openArchiveModal(): void {
+    this.archiveMenuOpen = false;
+    this.archiveModalOpen = true;
+  }
+
+  openArchivedCard(card: Card): void {
+    this.openCard.emit(card);
   }
 
   get skeletonAssignee(): BoardMemberDto | null {

@@ -3,7 +3,34 @@
       class="group flex h-full min-h-[min(70vh,640px)] w-72 shrink-0 flex-col rounded-lg border border-slate-800 bg-slate-900/60"
     >
       <div class="flex items-center justify-between border-b border-slate-800 px-3 py-2">
-        <h2 class="font-medium text-slate-100">{{ column.title }}</h2>
+        <h2 class="min-w-0 truncate font-medium text-slate-100">{{ column.title }}</h2>
+        <div class="flex shrink-0 items-center gap-1">
+          <div #archiveRoot class="relative">
+            <button
+              type="button"
+              class="rounded px-1.5 py-0.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-white"
+              aria-label="Column actions"
+              title="Column actions"
+              (click)="archiveMenuOpen = !archiveMenuOpen"
+            >
+              <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <circle cx="5" cy="12" r="1.6"></circle>
+                <circle cx="12" cy="12" r="1.6"></circle>
+                <circle cx="19" cy="12" r="1.6"></circle>
+              </svg>
+            </button>
+            @if (archiveMenuOpen) {
+              <div class="absolute right-0 top-full z-20 mt-1 w-44 rounded-md border border-slate-700 bg-slate-950 py-1 text-sm text-slate-100 shadow-xl">
+                <button
+                  type="button"
+                  class="block w-full px-3 py-1.5 text-left hover:bg-slate-800"
+                  (click)="openArchiveModal()"
+                >
+                  Archived tasks
+                </button>
+              </div>
+            }
+          </div>
         <button
           type="button"
           class="rounded px-1.5 py-0.5 text-sm text-slate-400 opacity-0 transition hover:bg-slate-800 hover:text-white group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-40"
@@ -13,6 +40,7 @@
         >
           +
         </button>
+        </div>
       </div>
       <div
         cdkDropList
@@ -174,7 +202,7 @@
           </article>
         }
         @for (c of column.cards; track c.id) {
-          @if (!(showSkeleton && c.id === skeletonCardId)) {
+          @if (!(showSkeleton && c.id === skeletonCardId) && !c.isDeleted) {
             <div
               cdkDrag
               [cdkDragData]="c"
@@ -189,9 +217,13 @@
                 [card]="c"
                 [members]="members"
                 [canToggleComplete]="canUpdateCards"
+                [canArchive]="canArchiveCards"
+                [canPurge]="canPurgeCards"
                 [togglingComplete]="togglingCardIds.has(c.id)"
                 (clicked)="openCard.emit(c)"
                 (toggleComplete)="toggleCardComplete.emit(c)"
+                (archive)="archiveCard.emit(c)"
+                (purge)="purgeCard.emit(c)"
                 (assigneeChange)="assigneeChange.emit({ card: c, userId: $event })"
                 (titleChange)="titleChange.emit({ card: c, title: $event })"
                 (deadlineChange)="deadlineChange.emit({ card: c, deadline: $event })"
@@ -209,5 +241,32 @@
           + Add card
         </button>
       </div>
+      @if (archiveModalOpen) {
+        <div class="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4" (click)="archiveModalOpen = false">
+          <div
+            class="flex max-h-[min(70vh,32rem)] w-full max-w-md flex-col rounded-xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"
+            (click)="$event.stopPropagation()"
+          >
+            <div class="mb-4 flex items-center justify-between gap-3">
+              <h2 class="min-w-0 truncate text-lg font-semibold text-white">Archived tasks</h2>
+              <button type="button" class="text-sm text-slate-400 hover:text-white" (click)="archiveModalOpen = false">Close</button>
+            </div>
+            <p class="mb-3 truncate text-xs text-slate-500">{{ column.title }}</p>
+            <div class="column-cards min-h-0 flex-1 overflow-y-auto">
+              @for (card of archivedCards; track card.id) {
+                <button
+                  type="button"
+                  class="block w-full truncate rounded-md px-3 py-2 text-left text-sm text-slate-100 hover:bg-slate-800"
+                  (click)="openArchivedCard(card)"
+                >
+                  {{ card.title }}
+                </button>
+              } @empty {
+                <p class="px-3 py-2 text-sm text-slate-500">No archived tasks</p>
+              }
+            </div>
+          </div>
+        </div>
+      }
     </div>
   

@@ -9,7 +9,9 @@
       (click)="onCardClick($event)"
     >
       <div
-        class="pr-10 transition"
+        class="transition"
+        [class.pr-16]="canArchive || canPurge"
+        [class.pr-10]="!(canArchive || canPurge)"
         [class.opacity-50]="card.taskComplete"
         [class.brightness-75]="card.taskComplete"
       >
@@ -176,6 +178,55 @@
           }
         </div>
       </div>
+      @if (canArchive || canPurge) {
+        <div #actionsRoot data-actions-control class="absolute right-10 top-2" (pointerdown)="$event.stopPropagation()">
+          <button
+            #actionsAnchor
+            type="button"
+            class="flex size-7 items-center justify-center rounded-full text-slate-300 hover:bg-white/10 hover:text-white"
+            aria-label="Card actions"
+            (click)="$event.stopPropagation(); toggleActionsMenu(actionsAnchor)"
+          >
+            <svg class="size-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="5" cy="12" r="1.6"></circle>
+              <circle cx="12" cy="12" r="1.6"></circle>
+              <circle cx="19" cy="12" r="1.6"></circle>
+            </svg>
+          </button>
+          @if (actionsMenuOpen) {
+            <div
+              #actionsPanel
+              class="fixed z-50 w-44 rounded-md border border-slate-700 bg-slate-950 py-1 text-sm text-slate-100 shadow-xl"
+              [style.top.px]="actionsTop"
+              [style.left.px]="actionsLeft"
+              (click)="$event.stopPropagation()"
+            >
+              @if (pendingAction) {
+                <p class="px-3 py-2 text-xs text-slate-300">
+                  {{ pendingAction === 'archive' ? 'Archive this card?' : 'Delete this card forever?' }}
+                </p>
+                <button type="button" class="block w-full px-3 py-1.5 text-left text-red-300 hover:bg-slate-800" (click)="confirmPendingAction()">
+                  Confirm
+                </button>
+                <button type="button" class="block w-full px-3 py-1.5 text-left text-slate-300 hover:bg-slate-800" (click)="pendingAction = null">
+                  Cancel
+                </button>
+              } @else {
+                @if (canArchive) {
+                  <button type="button" class="block w-full px-3 py-1.5 text-left hover:bg-slate-800" (click)="pendingAction = 'archive'">
+                    Archive
+                  </button>
+                }
+                @if (canPurge) {
+                  <button type="button" class="block w-full px-3 py-1.5 text-left text-red-300 hover:bg-slate-800" (click)="pendingAction = 'purge'">
+                    Delete forever
+                  </button>
+                }
+              }
+            </div>
+          }
+        </div>
+      }
       <button
         type="button"
         class="absolute right-2 top-2 flex size-7 items-center justify-center rounded-full text-white transition disabled:cursor-not-allowed disabled:opacity-50"

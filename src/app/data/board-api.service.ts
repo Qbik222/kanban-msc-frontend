@@ -97,8 +97,16 @@ export class BoardApiService {
     return this.http.patch<Card>(`${this.api}/cards/${id}/move`, body);
   }
 
-  deleteCard(id: string): Observable<void> {
-    return this.http.delete<void>(`${this.api}/cards/${id}`);
+  deleteCard(id: string): Observable<Card> {
+    return this.http.delete<Card>(`${this.api}/cards/${id}`);
+  }
+
+  purgeCard(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/cards/${id}/permanent`);
+  }
+
+  restoreCard(id: string): Observable<Card> {
+    return this.http.post<Card>(`${this.api}/cards/${id}/restore`, {});
   }
 
   addComment(cardId: string, body: { text: string }): Observable<Card> {

@@ -16,6 +16,7 @@ export const ROLE_PERMISSIONS: Record<BoardRole, readonly string[]> = {
     'card:update',
     'card:move',
     'card:delete',
+    'card:purge',
     'comment:create',
     'comment:delete:any',
     'comment:delete:own',

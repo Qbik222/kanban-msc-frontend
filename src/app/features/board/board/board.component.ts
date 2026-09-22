@@ -5,6 +5,7 @@ import { filter, map, switchMap, tap } from 'rxjs/operators';
 import { firstValueFrom, from } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { BoardApiService } from '../../../data/board-api.service';
+import { CardArchiveService } from '../../../data/card-archive.service';
 import { BoardStore } from '../../../state/board.store';
 import { TeamStore } from '../../../state/team.store';
 import { SocketService } from '../../../realtime/socket.service';
@@ -36,6 +37,7 @@ export class BoardComponent implements OnDestroy {
   @ViewChild(CardModalComponent) private cardModal?: CardModalComponent;
 
   readonly boardStore = inject(BoardStore);
+  readonly archive = inject(CardArchiveService);
   private readonly route = inject(ActivatedRoute);
   private readonly api = inject(BoardApiService);
   private readonly socket = inject(SocketService);
@@ -57,6 +59,7 @@ export class BoardComponent implements OnDestroy {
   private descriptionRequestIds = new Map<string, number>();
   private priorityRequestIds = new Map<string, number>();
   private deadlineRequestIds = new Map<string, number>();
+  private cardActionIds = new Set<string>();
 
   constructor() {
     this.route.paramMap
@@ -66,11 +69,12 @@ export class BoardComponent implements OnDestroy {
         filter((id): id is string => !!id),
         switchMap((id) => {
           this.boardMembers = [];
+          this.archive.load(id);
           this.socket.ensureConnected();
           this.socket.joinBoard(id);
           void this.loadBoardMembers(id);
           return from(this.boardStore.loadBoard(id)).pipe(
-            tap(() => {}),
+            tap(() => this.pruneArchive()),
           );
         }),
       )
@@ -182,10 +186,22 @@ export class BoardComponent implements OnDestroy {
       return;
     }
     const id = this.skeletonCardId;
+    const columnId = this.skeletonColumnId;
     this.clearSkeleton();
     try {
-      await firstValueFrom(this.api.deleteCard(id));
-      await this.boardStore.refreshActiveBoard();
+      if (this.boardStore.permissions().has('card:purge')) {
+        await firstValueFrom(this.api.purgeCard(id));
+      } else {
+        const archived = await firstValueFrom(this.api.deleteCard(id));
+        const boardId = archived.boardId || this.boardStore.activeBoard()?.id || '';
+        this.archive.remember({
+          ...archived,
+          boardId,
+          columnId: archived.columnId || columnId || '',
+          isDeleted: true,
+        });
+      }
+      this.boardStore.removeCard(id);
     } catch (e) {
       this.boardStore.setError(e instanceof Error ? e.message : 'Failed to cancel card draft');
     }
@@ -242,6 +258,84 @@ export class BoardComponent implements OnDestroy {
       return;
     }
     this.selectedCardId = card.id;
+  }
+
+  archivedCards(columnId: string): Card[] {
+    const liveIds = new Set(
+      (this.boardStore.activeBoard()?.columns ?? []).flatMap((column) => column.cards.map((card) => card.id)),
+    );
+    return this.archive.forColumn(columnId).filter((card) => !liveIds.has(card.id));
+  }
+
+  async archiveCard(card: Card): Promise<void> {
+    if (!this.beginCardAction(card.id)) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:delete')) {
+      this.boardStore.setError('No permission to archive cards');
+      this.endCardAction(card.id);
+      return;
+    }
+    this.boardStore.setError(null);
+    try {
+      const archived = await firstValueFrom(this.api.deleteCard(card.id));
+      const boardId = archived.boardId || card.boardId || this.boardStore.activeBoard()?.id || '';
+      this.archive.remember({ ...card, ...archived, boardId, isDeleted: true });
+      this.boardStore.removeCard(card.id);
+      if (this.selectedCardId === card.id) {
+        this.closeCardModal();
+      }
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to archive card');
+    } finally {
+      this.endCardAction(card.id);
+    }
+  }
+
+  async purgeCard(card: Card): Promise<void> {
+    if (!this.beginCardAction(card.id)) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:purge')) {
+      this.boardStore.setError('No permission to delete cards');
+      this.endCardAction(card.id);
+      return;
+    }
+    this.boardStore.setError(null);
+    try {
+      await firstValueFrom(this.api.purgeCard(card.id));
+      this.archive.forget(card.id);
+      this.boardStore.removeCard(card.id);
+      if (this.selectedCardId === card.id) {
+        this.closeCardModal();
+      }
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to delete card');
+    } finally {
+      this.endCardAction(card.id);
+    }
+  }
+
+  async restoreCard(card: Card): Promise<void> {
+    if (!this.beginCardAction(card.id)) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:delete')) {
+      this.boardStore.setError('No permission to restore cards');
+      this.endCardAction(card.id);
+      return;
+    }
+    this.boardStore.setError(null);
+    try {
+      const restored = await firstValueFrom(this.api.restoreCard(card.id));
+      this.archive.forget(card.id);
+      this.boardStore.upsertCard({ ...restored, isDeleted: false });
+      this.closeCardModal();
+    } catch (e) {
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to restore card');
+    } finally {
+      this.endCardAction(card.id);
+    }
   }
 
   closeCardModal(): void {
@@ -424,7 +518,28 @@ export class BoardComponent implements OnDestroy {
     if (!this.selectedCardId) {
       return null;
     }
-    return this.findCard(this.selectedCardId);
+    return this.findCard(this.selectedCardId) ?? this.archive.find(this.selectedCardId);
+  }
+
+  private pruneArchive(): void {
+    const board = this.boardStore.activeBoard();
+    if (!board) {
+      return;
+    }
+    const liveIds = new Set(board.columns.flatMap((column) => column.cards.map((card) => card.id)));
+    this.archive.forgetPresent(liveIds);
+  }
+
+  private beginCardAction(cardId: string): boolean {
+    if (this.cardActionIds.has(cardId)) {
+      return false;
+    }
+    this.cardActionIds.add(cardId);
+    return true;
+  }
+
+  private endCardAction(cardId: string): void {
+    this.cardActionIds.delete(cardId);
   }
 
   private async loadBoardMembers(boardId: string): Promise<void> {
