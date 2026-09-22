@@ -84,6 +84,7 @@
                 (clicked)="openCard.emit(c)"
                 (toggleComplete)="toggleCardComplete.emit(c)"
                 (assigneeChange)="assigneeChange.emit({ card: c, userId: $event })"
+                (titleChange)="titleChange.emit({ card: c, title: $event })"
               />
             </div>
           }

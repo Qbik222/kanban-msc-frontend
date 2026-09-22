@@ -30,6 +30,7 @@ export class ColumnComponent {
   @Output() openCard = new EventEmitter<Card>();
   @Output() toggleCardComplete = new EventEmitter<Card>();
   @Output() assigneeChange = new EventEmitter<{ card: Card; userId: string }>();
+  @Output() titleChange = new EventEmitter<{ card: Card; title: string }>();
   @Output() skeletonTitleChange = new EventEmitter<string>();
   @Output() skeletonStartDateChange = new EventEmitter<string>();
   @Output() skeletonEndDateChange = new EventEmitter<string>();

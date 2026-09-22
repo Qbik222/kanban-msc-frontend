@@ -1,4 +1,4 @@
-import { Component, ElementRef, EventEmitter, HostListener, Input, Output, ViewChild } from '@angular/core';
+import { Component, ElementRef, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges, ViewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { BoardMemberDto, Card } from '../../../models/board.models';
 
@@ -9,7 +9,7 @@ import { BoardMemberDto, Card } from '../../../models/board.models';
   templateUrl: './card.component.html',
   styleUrl: './card.component.scss',
 })
-export class CardComponent {
+export class CardComponent implements OnChanges {
   @ViewChild('assigneeRoot') private assigneeRoot?: ElementRef<HTMLElement>;
 
   @Input({ required: true }) card!: Card;
@@ -19,10 +19,22 @@ export class CardComponent {
   @Output() clicked = new EventEmitter<void>();
   @Output() toggleComplete = new EventEmitter<void>();
   @Output() assigneeChange = new EventEmitter<string>();
+  @Output() titleChange = new EventEmitter<string>();
 
   assigneeMenuOpen = false;
   menuTop = 0;
   menuLeft = 0;
+  draftTitle = '';
+  titleFocused = false;
+  private lastSubmittedTitle: string | null = null;
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['card'] || this.titleFocused) {
+      return;
+    }
+    this.draftTitle = this.card.title;
+    this.lastSubmittedTitle = null;
+  }
 
   get selectedMember(): BoardMemberDto | null {
     if (!this.card.assigneeId) {
@@ -57,7 +69,7 @@ export class CardComponent {
 
   onCardClick(event: MouseEvent): void {
     const target = event.target as HTMLElement | null;
-    if (target?.closest('[data-assignee-control]')) {
+    if (target?.closest('[data-assignee-control], [data-title-control]')) {
       return;
     }
     this.clicked.emit();
@@ -82,5 +94,36 @@ export class CardComponent {
       return;
     }
     this.assigneeChange.emit(userId);
+  }
+
+  onTitleBlur(): void {
+    this.titleFocused = false;
+    this.commitTitle();
+  }
+
+  onTitleEnter(event: Event, input: HTMLInputElement): void {
+    event.preventDefault();
+    this.commitTitle();
+    input.blur();
+  }
+
+  cancelTitle(input: HTMLInputElement): void {
+    this.draftTitle = this.card.title;
+    this.lastSubmittedTitle = null;
+    input.blur();
+  }
+
+  private commitTitle(): void {
+    const next = this.draftTitle.trim();
+    if (!next) {
+      this.draftTitle = this.card.title;
+      return;
+    }
+    this.draftTitle = next;
+    if (next === this.card.title || next === this.lastSubmittedTitle) {
+      return;
+    }
+    this.lastSubmittedTitle = next;
+    this.titleChange.emit(next);
   }
 }

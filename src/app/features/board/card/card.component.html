@@ -11,7 +11,23 @@
         [class.opacity-50]="card.taskComplete"
         [class.brightness-75]="card.taskComplete"
       >
-        <h3 class="font-medium text-slate-100">{{ card.title }}</h3>
+        @if (canToggleComplete) {
+          <input
+            #titleInput
+            data-title-control
+            class="w-full rounded border border-transparent bg-transparent px-1 py-0.5 font-medium text-slate-100 outline-none transition hover:border-slate-600 hover:bg-slate-900 focus:border-slate-500 focus:bg-slate-900"
+            [value]="draftTitle"
+            (input)="draftTitle = $any($event.target).value"
+            (focus)="titleFocused = true"
+            (blur)="onTitleBlur()"
+            (keydown.enter)="onTitleEnter($event, titleInput)"
+            (keydown.escape)="cancelTitle(titleInput)"
+            (pointerdown)="$event.stopPropagation()"
+            (click)="$event.stopPropagation()"
+          />
+        } @else {
+          <h3 class="font-medium text-slate-100">{{ card.title }}</h3>
+        }
         <div
           #assigneeRoot
           data-assignee-control

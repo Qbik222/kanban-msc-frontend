@@ -52,6 +52,7 @@ export class BoardComponent implements OnDestroy {
   togglingCardIds: ReadonlySet<string> = new Set();
   boardMembers: BoardMemberDto[] = [];
   private assigneeRequestId = 0;
+  private titleRequestIds = new Map<string, number>();
 
   constructor() {
     this.route.paramMap
@@ -264,6 +265,36 @@ export class BoardComponent implements OnDestroy {
         this.cardModal?.revertAssignee();
       }
       this.boardStore.setError(e instanceof Error ? e.message : 'Failed to update assignee');
+    }
+  }
+
+  async renameCard(cardId: string, title: string): Promise<void> {
+    const card = this.findCard(cardId);
+    const nextTitle = title.trim();
+    if (!card || !nextTitle || card.title === nextTitle) {
+      return;
+    }
+    if (!this.boardStore.permissions().has('card:update')) {
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError('No permission to update cards');
+      return;
+    }
+
+    const requestId = (this.titleRequestIds.get(cardId) ?? 0) + 1;
+    this.titleRequestIds.set(cardId, requestId);
+    this.boardStore.setError(null);
+    try {
+      const updated = await firstValueFrom(this.api.patchCard(cardId, { title: nextTitle }));
+      if (this.titleRequestIds.get(cardId) !== requestId) {
+        return;
+      }
+      this.boardStore.upsertCard(updated);
+    } catch (e) {
+      if (this.titleRequestIds.get(cardId) !== requestId) {
+        return;
+      }
+      this.boardStore.upsertCard({ ...card });
+      this.boardStore.setError(e instanceof Error ? e.message : 'Failed to rename card');
     }
   }
 

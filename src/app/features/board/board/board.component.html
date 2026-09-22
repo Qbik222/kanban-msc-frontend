@@ -57,6 +57,7 @@
               (openCard)="openCard($event)"
               (toggleCardComplete)="toggleCardComplete($event)"
               (assigneeChange)="assignCard($event.card.id, $event.userId)"
+              (titleChange)="renameCard($event.card.id, $event.title)"
               (skeletonTitleChange)="skeletonTitle = $event"
               (skeletonStartDateChange)="skeletonStartDate = $event"
               (skeletonEndDateChange)="skeletonEndDate = $event"
